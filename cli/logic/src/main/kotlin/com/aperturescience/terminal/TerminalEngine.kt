@@ -65,6 +65,17 @@ class TerminalEngine {
     private var gladosMessage = ""
     private val uid = synthesizeUid()
 
+    // Defaults to WRAP_WIDTH so existing behavior (and tests that never call
+    // setViewportWidth) is unchanged; a host UI narrower than that must call
+    // setViewportWidth before/while booting to avoid the redraw-desync bug described on
+    // [reveal].
+    private var wrapWidth = WRAP_WIDTH
+
+    /** Narrows future [reveal]-wrapped lines to fit a host terminal thinner than [WRAP_WIDTH]. */
+    fun setViewportWidth(columns: Int) {
+        if (columns > 0) wrapWidth = minOf(columns, WRAP_WIDTH)
+    }
+
     fun boot(coroutineScope: CoroutineScope) {
         scope = coroutineScope
         scope.launch {
@@ -454,10 +465,12 @@ class TerminalEngine {
      * `^` (the original's newline marker) becomes a line break and `@` (its UID placeholder)
      * is substituted, exactly as `placeText()` did in the source AS2 - this lets strings sourced
      * verbatim from [TerminalData] be passed straight through unmodified. Lines are also
-     * word-wrapped to [WRAP_WIDTH]: the original auto-wrapped unbroken text past a pixel-width
-     * threshold too, and without it a single long line soft-wraps in the real terminal while
-     * still animating, which can desync a UI's redraw bookkeeping (observed with Mosaic) and
-     * leave stray duplicate rows behind.
+     * word-wrapped to [wrapWidth] (at most [WRAP_WIDTH]): the original auto-wrapped unbroken
+     * text past a pixel-width threshold too, and without it a single long line soft-wraps in
+     * the real terminal while still animating, which can desync a UI's redraw bookkeeping
+     * (observed with Mosaic) and leave stray duplicate rows behind - the same desync happens
+     * if [wrapWidth] itself is wider than the host terminal's actual column count, which is
+     * why hosts narrower than [WRAP_WIDTH] must report their width via [setViewportWidth].
      */
     private suspend fun reveal(
         text: String,
@@ -465,7 +478,7 @@ class TerminalEngine {
         unlockAfter: Boolean = true,
     ) {
         val logicalLines = text.replace("@", "[$uid]").replace("^", "\n").split("\n")
-        val lines = logicalLines.flatMap { wordWrap(it, WRAP_WIDTH) }
+        val lines = logicalLines.flatMap { wordWrap(it, wrapWidth) }
         for ((index, line) in lines.withIndex()) {
             val base = pageContent
             if (delayMs > 0) {

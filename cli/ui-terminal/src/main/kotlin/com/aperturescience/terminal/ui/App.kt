@@ -2,10 +2,12 @@ package com.aperturescience.terminal.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import com.aperturescience.terminal.TerminalEngine
+import com.jakewharton.mosaic.LocalTerminalState
 import com.jakewharton.mosaic.layout.onKeyEvent
 import com.jakewharton.mosaic.modifier.Modifier
 import com.jakewharton.mosaic.ui.Text
@@ -13,6 +15,14 @@ import com.jakewharton.mosaic.ui.Text
 @Composable
 fun App(engine: TerminalEngine) {
     val scope = rememberCoroutineScope()
+
+    // Mosaic's Text never soft-wraps on its own (see TerminalEngine.reveal's doc) - it just
+    // draws whatever width the content already is, so a host terminal narrower than that
+    // desyncs Mosaic's own redraw bookkeeping and leaves stray duplicate rows on screen. Feeding
+    // the real column count in here (and on every resize, since this recomposes whenever
+    // LocalTerminalState changes) keeps reveal()'s wrapping honest.
+    val columns = LocalTerminalState.current.size.columns
+    SideEffect { engine.setViewportWidth(columns) }
 
     LaunchedEffect(Unit) {
         engine.boot(scope)
