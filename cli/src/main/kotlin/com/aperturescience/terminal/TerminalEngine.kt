@@ -5,7 +5,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.aperturescience.terminal.data.QuestionType
 import com.aperturescience.terminal.data.TerminalData
-import com.jakewharton.mosaic.StaticLogger
 import kotlin.random.Random
 import kotlin.system.exitProcess
 import kotlinx.coroutines.CoroutineScope
@@ -18,11 +17,13 @@ import kotlinx.coroutines.launch
  * `processInput0/1/2/5`, `switchPage`, `formatQuestion`, `thecakeisalie`, `bosskey`, and
  * `notesdisplay` functions closely enough that behavior (including its quirks) should match.
  *
- * Deliberate deviations from the original, since this targets a real scrolling terminal instead
- * of a single redrawn Flash canvas:
- *  - Completed output is appended to permanent scrollback instead of being wiped and redrawn.
- *  - Rejected/invalid input is simply not committed to scrollback (matching the original's
- *    "silently clear the field" behavior) rather than being erased after being shown.
+ * Rendering matches the original's `clearScreen()`-then-redraw model: every new page wipes
+ * [pageContent] and rebuilds it from scratch, exactly like the original wiped its Flash canvas
+ * before drawing the next banner - including that whatever you just typed disappears along with
+ * everything else. It is not echoed anywhere once submitted, matching the original.
+ *
+ * Deliberate deviations from the original, since this targets a real terminal instead of a
+ * Flash canvas:
  *  - `gdxt.php` server calls have no backend; they are no-ops. `uid` is synthesized locally.
  *  - Flash's `getURL()` navigation (LOGOUT / PLAY PORTAL) exits the program instead of opening
  *    a browser.
@@ -34,11 +35,12 @@ class TerminalEngine {
     var isLocked by mutableStateOf(true)
         private set
 
-    private lateinit var staticLogger: StaticLogger
     private lateinit var scope: CoroutineScope
 
     private val input = StringBuilder()
-    private var promptPrefix = ""
+
+    /** Everything drawn on the current page so far, up to (not including) the live input. */
+    private var pageContent = ""
 
     // --- state mirroring DoAction.as globals ---
     private var entryMode = MODE_LOGIN
@@ -53,10 +55,10 @@ class TerminalEngine {
     private var gladosMessage = ""
     private val uid = synthesizeUid()
 
-    fun boot(logger: StaticLogger, coroutineScope: CoroutineScope) {
-        staticLogger = logger
+    fun boot(coroutineScope: CoroutineScope) {
         scope = coroutineScope
         scope.launch {
+            clearScreen()
             reveal(TerminalData.qar[0], TerminalData.qdelay[0])
         }
     }
@@ -110,7 +112,12 @@ class TerminalEngine {
     private fun updateLiveLine() {
         val isPasswordPrompt = entryMode == MODE_LOGIN && (qon == 2 || qon == 3)
         val echoed = if (isPasswordPrompt) "*".repeat(input.length) else input.toString()
-        liveLine = promptPrefix + echoed
+        liveLine = pageContent + echoed
+    }
+
+    private fun clearScreen() {
+        pageContent = ""
+        liveLine = ""
     }
 
     private fun handlePaging(delta: Int) {
@@ -120,34 +127,35 @@ class TerminalEngine {
         if (next != pageOffset) {
             pageOffset = next
             isLocked = true
-            scope.launch { showQuestion() }
+            scope.launch {
+                clearScreen()
+                showQuestion()
+            }
         }
     }
 
     private suspend fun handleEnter() {
         isLocked = true
         val submitted = input.toString()
-        val committedPrompt = promptPrefix
 
         when (entryMode) {
-            MODE_LOGIN -> dispatchLogin(submitted, committedPrompt)
-            MODE_SHELL -> dispatchShell(submitted, committedPrompt)
-            MODE_APPLICATION -> dispatchApplication(submitted, committedPrompt)
-            MODE_NOTES -> dispatchNotes(committedPrompt)
+            MODE_LOGIN -> dispatchLogin(submitted)
+            MODE_SHELL -> dispatchShell(submitted)
+            MODE_APPLICATION -> dispatchApplication(submitted)
+            MODE_NOTES -> dispatchNotes()
         }
     }
 
     // ---------------------------------------------------------------------
     // entryMode 0 — login / job-application flow (processInput0 + switchPage case 0)
     // ---------------------------------------------------------------------
-    private suspend fun dispatchLogin(text: String, committedPrompt: String) {
+    private suspend fun dispatchLogin(text: String) {
         var advance = false
         // Mirrors the original's `case 8: qon = 0` and `case 3: qon = 2` switch fallthroughs,
         // which Kotlin's `when` does not support - normalize qon first so the shared logic below
         // (the `0 ->` / `2 ->` arms) runs for both the original and the fallthrough-aliased qon.
         if (qon == 8) qon = 0
         if (qon == 3) qon = 2
-        val isPasswordEntry = qon == 2
         when (qon) {
             0 -> {
                 advance = text == "LOGON" || text == "LOGIN" || text == "USER"
@@ -212,18 +220,17 @@ class TerminalEngine {
             else -> advance = true
         }
 
-        val committedText = if (isPasswordEntry) "*".repeat(text.length) else text
-        finishTurn(advance, committedPrompt, committedText)
+        finishTurn(advance)
     }
 
     // ---------------------------------------------------------------------
     // entryMode 1 — GLaDOS shell (processInput1)
     // ---------------------------------------------------------------------
-    private suspend fun dispatchShell(rawText: String, committedPrompt: String) {
+    private suspend fun dispatchShell(rawText: String) {
         val text = rawText.trimStart()
         if (text.isEmpty()) {
             // The original returns immediately without even clearing the field.
-            liveLine = promptPrefix + input
+            liveLine = pageContent + input
             isLocked = false
             return
         }
@@ -256,7 +263,6 @@ class TerminalEngine {
             }
 
             "LOGOUT", "BYE", "LOGOFF", "VALVE" -> {
-                commitLine(committedPrompt, rawText)
                 farewell("http://www.steampowered.com/")
                 return
             }
@@ -267,7 +273,6 @@ class TerminalEngine {
             "PLAY" -> when {
                 args.size == 1 -> gladosMessage = "\n\nERROR 03 [What would you like to play?]"
                 args.getOrNull(1) == "PORTAL" -> {
-                    commitLine(committedPrompt, rawText)
                     farewell("http://www.youtube.com/watch?v=0h50K2NVJHM")
                     return
                 }
@@ -299,21 +304,19 @@ class TerminalEngine {
             else -> gladosMessage = "\n\nERROR 24 [File '${args[0]}' not found]"
         }
 
-        commitLine(committedPrompt, rawText)
         showNextPage()
     }
 
     // ---------------------------------------------------------------------
     // entryMode 2 — job application questionnaire (processInput2)
     // ---------------------------------------------------------------------
-    private suspend fun dispatchApplication(text: String, committedPrompt: String) {
+    private suspend fun dispatchApplication(text: String) {
         // Matches an original off-by-one: once qon reaches the question count, Enter ends the
         // form immediately without validating (or submitting) whatever was typed for the last
         // question.
         if (qon >= TerminalData.questions.size) {
             qon = 8
             entryMode = MODE_LOGIN
-            commitLine(committedPrompt, text)
             showNextPage()
             return
         }
@@ -336,18 +339,17 @@ class TerminalEngine {
             advance = true
         }
 
-        finishTurn(advance, committedPrompt, text)
+        finishTurn(advance)
     }
 
     // ---------------------------------------------------------------------
     // entryMode 5 — NOTES.EXE reader (processInput5)
     // ---------------------------------------------------------------------
-    private suspend fun dispatchNotes(committedPrompt: String) {
+    private suspend fun dispatchNotes() {
         notesPage += 1
         if (notesPage > MAX_NOTES_PAGE) {
             entryMode = MODE_SHELL
         }
-        commitLine(committedPrompt, "")
         showNextPage()
     }
 
@@ -356,23 +358,20 @@ class TerminalEngine {
     // ---------------------------------------------------------------------
 
     /** Mirrors the accept/reject branch at the bottom of processInput0/processInput2. */
-    private suspend fun finishTurn(advance: Boolean, committedPrompt: String, text: String) {
+    private suspend fun finishTurn(advance: Boolean) {
         if (advance) {
-            commitLine(committedPrompt, text)
             showNextPage()
         } else {
             input.clear()
-            liveLine = promptPrefix
+            liveLine = pageContent
             isLocked = false
         }
     }
 
-    private fun commitLine(prompt: String, text: String) {
-        staticLogger += prompt + text
-    }
-
-    /** Mirrors switchPage(): pageOffset reset, then dispatch on the (possibly just-changed) entryMode. */
+    /** Mirrors switchPage(): clears the screen, resets pageOffset, then dispatches on the
+     * (possibly just-changed) entryMode - exactly one clear-and-redraw per page transition. */
     private suspend fun showNextPage() {
+        clearScreen()
         pageOffset = 0
         input.clear()
         when (entryMode) {
@@ -431,14 +430,19 @@ class TerminalEngine {
     private fun bosskeyScreen(): String = BOSSKEY_SPREADSHEET
 
     private suspend fun farewell(url: String) {
+        clearScreen()
         reveal("\n[Connection closed. This would open $url in your browser.]\n", GLADOS_SPEED)
         delay(400)
         exitProcess(0)
     }
 
     /**
-     * Types [text] out one character at a time, leaving the final line live as the new prompt
-     * for input. delayMs <= 0 reveals instantly.
+     * Types [text] out one character at a time, appending onto whatever is already in
+     * [pageContent] (call [clearScreen] first for a fresh page - a full page is usually built
+     * from several chained `reveal`/`revealInstant` calls, e.g. a question's header followed by
+     * its instantly-revealed choice list, matching how the original's `formatQuestion()` made
+     * one `placeText()` call - which cleared - followed by manually placed choice text - which
+     * didn't). delayMs <= 0 reveals instantly.
      *
      * `^` (the original's newline marker) becomes a line break and `@` (its UID placeholder)
      * is substituted, exactly as `placeText()` did in the source AS2 - this lets strings sourced
@@ -451,30 +455,30 @@ class TerminalEngine {
         val logicalLines = text.replace("@", "[$uid]").replace("^", "\n").split("\n")
         val lines = logicalLines.flatMap { wordWrap(it, WRAP_WIDTH) }
         for ((index, line) in lines.withIndex()) {
-            val isLast = index == lines.lastIndex
+            val base = pageContent
             if (delayMs > 0) {
                 val sb = StringBuilder()
                 for (ch in line) {
                     sb.append(ch)
-                    liveLine = sb.toString()
+                    liveLine = base + sb
                     delay(delayMs.toLong())
                 }
+                pageContent = base + sb
             } else {
-                liveLine = line
+                pageContent = base + line
+                liveLine = pageContent
             }
-            if (isLast) {
-                promptPrefix = liveLine
-            } else {
-                staticLogger += liveLine
-                liveLine = ""
+            if (index != lines.lastIndex) {
+                pageContent += "\n"
             }
         }
+        liveLine = pageContent
         if (unlockAfter) {
             isLocked = false
         }
     }
 
-    /** Reveals every line instantly; still keeps the last line live as the prompt. */
+    /** Reveals every line instantly, appending onto [pageContent] (see [reveal]). */
     private suspend fun revealInstant(text: String) = reveal(text, 0)
 
     private fun wordWrap(line: String, width: Int): List<String> {

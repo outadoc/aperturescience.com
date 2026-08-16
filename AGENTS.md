@@ -102,16 +102,23 @@ terminal library — `kotlin("plugin.compose")` + Compose `remember`/
 
 - Requires `mavenCentral()` **and** `google()` repositories (transitive
   `androidx.lifecycle`/`androidx.annotation` artifacts).
-- `LocalStaticLogger.current` (`.log(string)` / `+=`) prints permanent,
-  never-redrawn scrollback lines — used for everything the terminal has
-  already "typed out". Only the in-progress typewriter line / live prompt is
-  kept as recomposable `@Composable` state (`TerminalEngine.liveLine`). This
-  matters for performance (the 2313-entry Q21 choice list) and is *required*
-  for correctness: animating a single long unbroken line long enough to
-  soft-wrap in the real terminal desyncs Mosaic's redraw bookkeeping and
-  leaves stray duplicate rows behind (see `TerminalEngine.wordWrap`/
-  `WRAP_WIDTH` — ported the original's own pixel-width auto-wrap for exactly
-  this reason).
+- The whole current page (`TerminalEngine.pageContent`/`liveLine`) is a
+  single dynamic `@Composable` `Text()` bound to Compose state, **not**
+  `LocalStaticLogger`/`StaticEffect` (Mosaic's Ink.js-style "permanent,
+  never-redrawn scrollback" mechanism — there's no such thing in the
+  original, which always clears and redraws its whole canvas, so a
+  never-cleared log would be unfaithful). `Text()` splits its `value` on
+  `\n` and remeasures `height` every recomposition (see
+  `mosaic-runtime/.../text/TextLayout.kt`), so replacing the whole string
+  wholesale is exactly what makes Mosaic erase the old (possibly taller)
+  page and redraw the new one — this *is* the clear-and-redraw effect,
+  achieved through Mosaic's own diffing rather than manual ANSI clear
+  codes, which would desync its redraw bookkeeping.
+- Word-wrap unbroken text to `WRAP_WIDTH` before animating it
+  (`TerminalEngine.wordWrap`, porting the original's own pixel-width
+  auto-wrap). Without it, a single long line can soft-wrap in the real
+  terminal while still being typed character-by-character, which desyncs
+  Mosaic's redraw bookkeeping and leaves stray duplicate rows behind.
 - Mosaic requires a real interactive TTY; it prints an error and refuses to
   run under Gradle's captured output or a plain pipe. Test manually via
   `tmux` (`tmux new-session -d -x 120 -y 50 "..."`, `tmux send-keys`,
@@ -145,12 +152,16 @@ terminal library — `kotlin("plugin.compose")` + Compose `remember`/
   Not manually walked: the 2313-entry Q21 PgUp/PgDn pagination specifically
   (code-reviewed, shares the tested choice-rendering path) and every one of
   the 50 questions individually.
-- Known deviations from the original (intentional, not bugs): scrolling
-  transcript instead of screen-clear-and-redraw; rejected input isn't shown
-  at all (rather than shown-then-erased); `gdxt.php` calls are no-ops and
-  `uid` is a locally-synthesized random string; `LOGOUT`/`PLAY PORTAL` print
-  a message and exit the process instead of navigating a browser; the cake
-  video is a text placeholder (`security02.flv` isn't reproduced); cosmetic-
-  only effects (glitching UID digits, random cake-image flicker) are skipped.
+- Matches the original's clear-and-redraw model: every page transition wipes
+  the screen and redraws from scratch, and — like the original — whatever
+  you just typed is never echoed anywhere once submitted, it simply
+  disappears along with the rest of the old page.
+- Known deviations from the original (intentional, not bugs): `gdxt.php`
+  calls are no-ops and `uid` is a locally-synthesized random string;
+  `LOGOUT`/`PLAY PORTAL` print a message and exit the process instead of
+  navigating a browser; the cake video is a text placeholder
+  (`security02.flv` isn't reproduced); cosmetic-only effects (glitching UID
+  digits, random cake-image flicker) are skipped.
 - Not yet done: no automated test suite (all verification so far is manual/
-  interactive); `README.md` for the `cli/` project.
+  interactive via `tmux`). See `cli/README.md` for build/run instructions
+  and the full command/state tree.
