@@ -16,9 +16,13 @@ import kotlinx.coroutines.launch
  * `processInput0/1/2/5`, `switchPage`, `formatQuestion`, `thecakeisalie`, `bosskey`, and
  * `notesdisplay` functions closely enough that behavior (including its quirks) should match.
  *
- * This class has no UI dependency of any kind - [liveLine] is a plain [StateFlow] any front end
- * can collect, and [onKeyEvent] takes a plain key name. Ctrl+C is handled by the UI layer, not
- * here - it's our own escape hatch, not part of the original terminal's modeled behavior.
+ * This class has no UI dependency of any kind, and never terminates the process itself (no
+ * `exitProcess`/`System.exit()` anywhere here - that would be fatal to embed in a test suite or a
+ * server): [liveLine] is a plain [StateFlow] any front end can collect, [onKeyEvent] takes a
+ * plain key name, and [exitRequested] is how it signals "this session is over" - the host
+ * decides what that actually means (end a coroutine, close a connection, exit a CLI process...).
+ * Ctrl+C is handled by the UI layer, not here - it's our own escape hatch, not part of the
+ * original terminal's modeled behavior.
  *
  * Rendering matches the original's `clearScreen()`-then-redraw model: every new page wipes
  * [pageContent] and rebuilds it from scratch, exactly like the original wiped its Flash canvas
@@ -28,14 +32,18 @@ import kotlinx.coroutines.launch
  * Deliberate deviations from the original, since this targets a real terminal instead of a
  * Flash canvas:
  *  - `gdxt.php` server calls have no backend; they are no-ops. `uid` is synthesized locally.
- *  - Flash's `getURL()` navigation (LOGOUT / PLAY PORTAL) prints a message instead of opening a
- *    browser. This class never terminates the process itself - that's a host/UI-layer decision,
- *    not this engine's; [farewell] is otherwise a no-op once its message has been shown.
+ *  - Flash's `getURL()` navigation (LOGOUT / PLAY PORTAL) ends the session instead of opening
+ *    a browser.
  *  - The cosmetic "glitching UID digits" and rare cake-image flicker are not reproduced.
  */
 class TerminalEngine {
     private val _liveLine = MutableStateFlow("")
     val liveLine: StateFlow<String> = _liveLine.asStateFlow()
+
+    private val _exitRequested = MutableStateFlow(false)
+
+    /** True once the session should end (LOGOUT/PLAY PORTAL) - see the class doc. */
+    val exitRequested: StateFlow<Boolean> = _exitRequested.asStateFlow()
 
     private var isLocked = true
 
@@ -431,6 +439,8 @@ class TerminalEngine {
     private suspend fun farewell(url: String) {
         clearScreen()
         reveal("\n[Connection closed. This would open $url in your browser.]\n", GLADOS_SPEED)
+        delay(400)
+        _exitRequested.value = true
     }
 
     /**

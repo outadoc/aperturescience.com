@@ -137,37 +137,55 @@ things worth knowing:
   `tmux` (`tmux new-session -d -x 120 -y 50 "..."`, `tmux send-keys`,
   `tmux capture-pane -p`) or `script -qec "... " /dev/null`, not `gradle run`
   with piped input.
-- Mosaic's own frame loop has built-in Ctrl+C handling, but only when no
-  `onKeyEvent` in the tree already reported the key as handled - and only
-  when the *ctrl* modifier is actually checked. `KeyEvent("c", ctrl = true)`
-  and a plain lowercase `c` keypress both have `key == "c"`; if you only look
-  at `.key` Ctrl+C is indistinguishable from typing the letter C and gets
-  swallowed as text input. `App.kt`'s `onKeyEvent` modifier checks
-  `event.ctrl && event.key == "c"` and calls `exitProcess(0)` directly,
-  *before* ever calling `engine.onKeyEvent(...)` - so it always works,
-  unconditionally, regardless of the engine's internal lock/mode state,
-  including mid-typewriter-animation and inside the cake/bosskey loop (which
-  otherwise has no in-story way back to the shell). This is deliberately a
-  UI-layer concern, not `TerminalEngine`'s: Ctrl+C is our own escape hatch,
-  not part of the original terminal's modeled behavior, unlike `LOGOUT`/
-  `PLAY PORTAL` (faithfully-ported in-game commands that also call
-  `exitProcess()`, but from inside `TerminalEngine.farewell()` since exiting
-  really is what the original scripted for those). `TerminalEngine.
-  onKeyEvent` takes only a plain `key: String` - no `ctrl` parameter at all.
+- **No `exitProcess()`/`System.exit()` anywhere in this codebase** - fatal to
+  call from something meant to be embeddable in a test suite or a server, so
+  every exit path is a normal, cooperative coroutine completion instead:
+  - Ctrl+C: Mosaic's own frame loop has built-in handling for it, but only
+    when no `onKeyEvent` in the tree already reported the key as handled -
+    and only when the *ctrl* modifier is actually checked (`KeyEvent("c",
+    ctrl = true)` and a plain lowercase `c` keypress both have `key == "c"`;
+    looking only at `.key` makes Ctrl+C indistinguishable from typing the
+    letter C, which would swallow it as text input). `App.kt`'s `onKeyEvent`
+    modifier checks `event.ctrl && event.key == "c"` and returns `false`
+    (explicitly *not handled*) instead of forwarding to
+    `engine.onKeyEvent(...)` - Mosaic's own root-level handler then does the
+    actual cancellation (its own internal composition `job.cancel()`),
+    letting `runMosaic()` return normally. This works unconditionally,
+    regardless of the engine's internal lock/mode state, including
+    mid-typewriter-animation and inside the cake/bosskey loop (which
+    otherwise has no in-story way back to the shell). Deliberately a
+    UI-layer concern, not `TerminalEngine`'s: Ctrl+C is our own escape
+    hatch, not part of the original terminal's modeled behavior.
+  - `LOGOUT`/`PLAY PORTAL`: these *are* faithfully-ported in-game commands
+    that end the session (the original navigated away via `getURL()`), so
+    `TerminalEngine.farewell()` sets `_exitRequested.value = true` on a
+    `MutableStateFlow<Boolean>` exposed as `exitRequested`. Unlike Ctrl+C,
+    Mosaic has no built-in hook for this, so `Main.kt` watches it itself:
+    `runBlocking { val mosaicJob = launch { runMosaic { App(engine) } };
+    val watcherJob = launch { engine.exitRequested.first { it };
+    mosaicJob.cancel() }; mosaicJob.join(); watcherJob.cancel() }` - a
+    standard, structured-concurrency cancellation, not a process kill.
+    (Earlier attempt that didn't work, for reference: mirroring Mosaic's own
+    "robot" sample - `if (!exitRequested) LaunchedEffect(Unit) {
+    awaitCancellation() }` inside `App()` - compiles fine but the process
+    just hangs forever after `LOGOUT`; verified empirically via `tmux`, not
+    just reasoned about. Whatever `runMosaicComposition.awaitComplete()`
+    actually waits on, it is not "no more suspended `LaunchedEffect`s in the
+    tree" in the way that pattern assumes.)
 - Mosaic has no built-in alternate-screen-buffer support (confirmed: no
   `1049` anywhere in its source), so `Main.kt` drives it directly - writes
-  `ESC[?1049h` (enter) before `runMosaicBlocking` starts and registers a
+  `ESC[?1049h` (enter) before entering `runBlocking` and registers a
   `Runtime.addShutdownHook` that writes `ESC[?1049l` (leave). This is what
   makes the whole *terminal* (not just our own drawn region) clear on
-  startup and restores whatever was there before on exit, like vim/htop. A
-  shutdown hook, not a `try`/`finally` around `runMosaicBlocking`, is
-  required: `TerminalEngine`'s exit paths call `exitProcess()` from inside a
-  coroutine (Ctrl+C, `LOGOUT`, `PLAY PORTAL`), which never unwinds back
-  through `main()`'s call stack - `System.exit()` still runs shutdown hooks
-  though, so that's the one place that reliably fires on every exit path.
+  startup and restores whatever was there before on exit, like vim/htop.
+  The shutdown hook (rather than only a `try`/`finally`) is kept as a
+  fallback for exits that bypass normal Kotlin control flow entirely - e.g.
+  SIGTERM/SIGHUP from outside the process - since every in-process exit path
+  is now cooperative and would hit a `finally` anyway.
   Verified via `tmux`: pre-existing shell content is hidden on launch and
   exactly restored (plus the shell's own record of the launch command) after
-  exit via both Ctrl+C and `LOGOUT`, with the terminal left in a normal,
+  exit via Ctrl+C (idle, mid-animation, and from inside the cake/bosskey
+  loop), `LOGOUT`, and `PLAY PORTAL`, with the terminal left in a normal,
   working state afterward.
 
 ## Status (2026-08-16)
