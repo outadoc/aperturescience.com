@@ -598,6 +598,17 @@ class TerminalEngine {
             }
         }
 
+        // The original's thecakeisalie() doesn't use placeText()'s normal typewriter+auto-wrap
+        // path at all - it manually places each par[i] entry as its own text field, stacked by Y
+        // position. Sentences that ran long were split across several par[] entries purely
+        // because they didn't fit the original embedded Flash movie's much narrower canvas
+        // width, not because they're actually separate thoughts - e.g. par[5..8] is one
+        // continuous run ("I did find out a few things ... Check out this security feed.")
+        // spread across four array entries. Reconstructed here as actual sentences/paragraphs
+        // (joined with spaces, not \n) so this reflows normally instead of hard-breaking
+        // mid-clause the way the original's array boundaries would - matching how TerminalData's
+        // qar[]/cjhistory[]-sourced text (a different, auto-wrapping rendering path in the
+        // original) already only hard-breaks at genuine paragraph boundaries.
         private val CAKE_MONOLOGUE_1 =
             listOf(
                 ">",
@@ -605,12 +616,11 @@ class TerminalEngine {
                 "When was the last time you left the building?",
                 "Has anybody left the building lately?",
                 "I don't know why we're in lockdown. I don't know who's in charge.",
-                "I did find out a few things, like these terminals don't have to",
-                "tap out characters one at a time. And while we're all working",
-                "on twenty year old equipment, somehow they can afford to build",
-                "an 'Enrichment Center'. Check out this security feed.",
-                "Whatever the hell a 'relaxation vault' is, it",
-                "doesn't have any doors.",
+                "I did find out a few things, like these terminals don't have to tap out " +
+                    "characters one at a time. And while we're all working on twenty year old " +
+                    "equipment, somehow they can afford to build an 'Enrichment Center'. Check " +
+                    "out this security feed.",
+                "Whatever the hell a 'relaxation vault' is, it doesn't have any doors.",
                 "",
                 "[ERROR: SECURITY02.FLV NOT FOUND]",
                 "",
@@ -618,6 +628,7 @@ class TerminalEngine {
 
         private val CAKE_MONOLOGUE_2 =
             listOf(
+                "",
                 "I don't think going home is part of our job description anymore.",
                 "If a supervisor walks by, press return!",
             ).joinToString("\n")
