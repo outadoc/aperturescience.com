@@ -418,7 +418,11 @@ class TerminalEngine {
                 delay(2000) // stand-in for security02.flv playback
                 reveal(CAKE_MONOLOGUE_2, 0)
             }
-            MODE_NOTES -> reveal(TerminalData.cjHistory[notesPage - 1] + "\n\n[press ENTER to continue]", NOTES_SPEED)
+            // Verbatim, matching the original's notesdisplay(): cjHistory's own text already
+            // ends in "[MORE]"/"[END]" (see TerminalData) - nothing appended here, faithfully
+            // (the original never printed a "press ENTER to continue" hint either; any accepted
+            // key already advances a NOTES.EXE page regardless, see onKeyEvent's MODE_NOTES arm).
+            MODE_NOTES -> reveal(TerminalData.cjHistory[notesPage - 1], NOTES_SPEED)
         }
     }
 

@@ -18,7 +18,7 @@ class NotesExeTest {
             val engine = loginAsAdmin()
             submit(engine, "NOTES")
             assertTrue(engine.liveLine.value.contains("1953"))
-            assertTrue(engine.liveLine.value.contains("[press ENTER to continue]"))
+            assertTrue(engine.liveLine.value.contains("[MORE]"))
         }
 
     @Test
