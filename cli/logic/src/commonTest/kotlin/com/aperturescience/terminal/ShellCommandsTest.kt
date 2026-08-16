@@ -208,7 +208,7 @@ class ShellCommandsTest {
                 val engine = loginToShell()
                 submit(engine, cmd)
                 assertTrue(engine.exitRequested.value, "expected exitRequested after '$cmd'")
-                assertTrue(engine.liveLine.value.contains("steampowered.com"))
+                assertTrue(engine.liveLine.value.contains("[ERROR: STORE NOT FOUND]"))
             }
         }
 
@@ -218,7 +218,7 @@ class ShellCommandsTest {
             val engine = loginToShell()
             submit(engine, "PLAY PORTAL")
             assertTrue(engine.exitRequested.value)
-            assertTrue(engine.liveLine.value.contains("youtube.com"))
+            assertTrue(engine.liveLine.value.contains("[ERROR: TRAILER NOT FOUND]"))
         }
 
     @Test

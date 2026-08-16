@@ -290,7 +290,7 @@ class TerminalEngine {
             }
 
             "LOGOUT", "BYE", "LOGOFF", "VALVE" -> {
-                farewell("http://www.steampowered.com/")
+                farewell("ERROR: STORE NOT FOUND")
                 return
             }
 
@@ -301,7 +301,7 @@ class TerminalEngine {
                 when {
                     args.size == 1 -> gladosMessage = "\n\nERROR 03 [What would you like to play?]"
                     args.getOrNull(1) == "PORTAL" -> {
-                        farewell("http://www.youtube.com/watch?v=0h50K2NVJHM")
+                        farewell("ERROR: TRAILER NOT FOUND")
                         return
                     }
                 }
@@ -461,9 +461,16 @@ class TerminalEngine {
         showNextPage()
     }
 
-    private suspend fun farewell(url: String) {
+    /**
+     * Ends the session in place of the original's `getURL()` browser navigation (LOGOUT to
+     * steampowered.com, PLAY PORTAL to the trailer), which a terminal can't perform - shown as
+     * an in-universe terminal error rather than a bracketed dev note explaining what would have
+     * happened (matching the CAKE_MONOLOGUE_1 security02.flv fix: `[errorMessage]`, not
+     * "this would open <url> in your browser").
+     */
+    private suspend fun farewell(errorMessage: String) {
         clearScreen()
-        reveal("\n[Connection closed. This would open $url in your browser.]\n", GLADOS_SPEED)
+        reveal("\n[$errorMessage]\n", GLADOS_SPEED)
         delay(400)
         _exitRequested.value = true
     }
@@ -605,7 +612,7 @@ class TerminalEngine {
                 "Whatever the hell a 'relaxation vault' is, it",
                 "doesn't have any doors.",
                 "",
-                "[security02.flv would play here]",
+                "[ERROR: SECURITY02.FLV NOT FOUND]",
                 "",
             ).joinToString("\n")
 

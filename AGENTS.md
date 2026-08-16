@@ -335,10 +335,21 @@ instead of Mosaic's `Text()`/`onKeyEvent`.
   disappears along with the rest of the old page.
 - Known deviations from the original (intentional, not bugs): `gdxt.php`
   calls are no-ops and `uid` is a locally-synthesized random string;
-  `LOGOUT`/`PLAY PORTAL` print a message and exit the process instead of
-  navigating a browser; the cake video is a text placeholder
-  (`security02.flv` isn't reproduced); cosmetic-only effects (glitching UID
-  digits, random cake-image flicker) are skipped.
+  `LOGOUT`/`PLAY PORTAL` (`farewell()`) end the session instead of
+  navigating a browser to steampowered.com/the trailer, shown as an
+  in-universe terminal error (`[ERROR: STORE NOT FOUND]` /
+  `[ERROR: TRAILER NOT FOUND]`) rather than a bracketed dev note explaining
+  what would have happened - an earlier version's "this would open <url> in
+  your browser" had exactly the same leaked-implementation-note problem as
+  `CAKE_MONOLOGUE_1`'s security02.flv placeholder below, fixed the same way;
+  the cake video isn't reproduced - in its place, `CAKE_MONOLOGUE_1` shows
+  `[ERROR: SECURITY02.FLV NOT FOUND]`, an in-universe terminal error rather
+  than a bracketed dev note like an earlier version's `[security02.flv
+  would play here]` (which wasn't in the original's own text at all -
+  `qar[11]`/`glob_ns.play("security02.flv")` in `DoAction.as` play the video
+  as a real overlay with no such line in the terminal text itself);
+  cosmetic-only effects (glitching UID digits, random cake-image
+  flicker) are skipped.
 - `cli/logic` has an automated unit test suite (`kotlin.test` +
   `kotlinx-coroutines-test`, `./gradlew :logic:allTests` - runs on both the
   `jvm` and `linuxX64` targets since the tests live in `src/commonTest/`):
