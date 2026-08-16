@@ -227,13 +227,31 @@ instead of Mosaic's `Text()`/`onKeyEvent`.
 - `src/wasmJsMain/kotlin/.../Main.kt`: `main()` grabs `<pre id="terminal">`
   by id, launches a coroutine collecting `engine.liveLine` into its
   `textContent` (a full-string replacement each emission - simpler than
-  Mosaic's diffing approach and correct here because the browser's own text
-  layout does real soft-wrapping, so there's no analog of the
-  Mosaic-desync-on-narrow-terminal bug `wrapWidth`/`setViewportWidth` exists
-  to avoid on the CLI side), and forwards `keydown` events to
+  Mosaic's diffing approach, and safe to do this way because there's no
+  analog of the Mosaic-desync-on-narrow-terminal bug `wrapWidth`/
+  `setViewportWidth` exists to avoid on the CLI side, see
+  `TerminalEngine.setViewportWidth`'s doc), and forwards `keydown` events to
   `engine.onKeyEvent`. Ctrl/Cmd/Alt combos are deliberately *not* forwarded
   (and not `preventDefault()`-ed) so browser/OS shortcuts keep working -
   this frontend's equivalent of `App.kt` returning `false` for Ctrl+C.
+  `Main.kt` calls `engine.setViewportWidth(Int.MAX_VALUE)` once at startup
+  to suppress `TerminalEngine`'s own hard-wrapping *entirely*, leaving
+  `#terminal`'s `white-space: pre-wrap` (styles.css) as the only layer
+  deciding where lines actually break. Two things were tried first and both
+  looked broken: (1) not calling `setViewportWidth` at all, i.e. leaving the
+  default `WRAP_WIDTH` (100) in effect - since that's a plain hardcoded
+  character count with no awareness of the actual rendered font metrics or
+  viewport size, its break points don't move on resize and can land well
+  short of where the text would naturally wrap, reading as random early
+  breaks; (2) computing an approximate column count from
+  `window.innerWidth` and a guessed px-per-character constant and passing
+  *that* to `setViewportWidth` - same problem, still a hardcoded-metric
+  hard-wrap independent of the browser's real layout, just with a
+  differently-wrong number. Both are two engines disagreeing about where to
+  break the same text; letting exactly one (the browser's, which has the
+  real metrics and re-wraps correctly on every resize for free) own the
+  decision is what actually fixes it, not tuning either number closer to
+  the other.
 - `src/wasmJsMain/resources/index.html` + `styles.css`: hand-written, not
   Kotlin-generated - a green-phosphor-on-black CRT-styled page with a
   blinking block-cursor `::after` on the terminal element (there's no

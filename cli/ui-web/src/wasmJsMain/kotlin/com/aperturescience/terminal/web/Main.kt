@@ -38,14 +38,24 @@ fun main() {
         acceptingInput = false
     }
 
-    // Explicitly-typed (Event) -> Unit values, not inline lambda literals, to sidestep overload
+    // Suppresses TerminalEngine's own hard-wrapping entirely (see setViewportWidth's doc): there
+    // is no Mosaic-style redraw-desync risk here to guard against in the first place (this
+    // renders by replacing textContent wholesale, no cursor/diffing involved), so the only job
+    // left for reveal()'s wordWrap is picking *where* long lines break - a job CSS's own
+    // `white-space: pre-wrap` (styles.css) already does correctly and, unlike a fixed character
+    // count, responsively as the window resizes. Running both at once was tried first and looked
+    // broken even when nominally "agreeing" (both around 100 characters): TerminalEngine's own
+    // wordWrap uses a hardcoded character count with no knowledge of the actual rendered font
+    // metrics or available width, so its break points don't move as the window resizes and can
+    // land well short of - or occasionally past - where the real text would naturally wrap,
+    // which reads as randomly-short, "already hard-wrapped" lines. Letting exactly one layer (the
+    // browser's) own all wrapping decisions is what actually fixes that, not tuning the number.
+    engine.setViewportWidth(UNWRAPPED_WIDTH)
+
+    // Explicitly-typed (Event) -> Unit value, not an inline lambda literal, to sidestep overload
     // ambiguity between addEventListener's `EventListener` (SAM-convertible external interface)
     // and `(Event) -> Unit` overloads - a bare lambda literal argument is ambiguous between the
     // two, a value with an already-resolved static type isn't.
-    val onResize: (Event) -> Unit = { engine.setViewportWidth(columnsForViewportWidth()) }
-    window.addEventListener("resize", onResize)
-    engine.setViewportWidth(columnsForViewportWidth())
-
     val onKeyDown: (Event) -> Unit = { event ->
         if (acceptingInput) handleKeyDown(event as KeyboardEvent, engine)
     }
@@ -56,17 +66,10 @@ fun main() {
 
 private const val TERMINAL_ELEMENT_ID = "terminal"
 
-// Matches the `ch`-unit max width the terminal element is styled with in CSS (see styles.css):
-// this reverse-engineers the same column count from the viewport instead of hardcoding it twice.
-// See TerminalEngine.setViewportWidth's doc for why this needs to happen at all - unlike the
-// CLI's real terminal columns, a browser window has no character grid, so this is this
-// frontend's own approximation of one.
-private fun columnsForViewportWidth(): Int {
-    val approxCharWidthPx = 9
-    val horizontalPaddingPx = 48
-    val usablePx = (window.innerWidth - horizontalPaddingPx).coerceAtLeast(approxCharWidthPx * 20)
-    return usablePx / approxCharWidthPx
-}
+// Larger than any real line TerminalData contains, which is all TerminalEngine.wordWrap needs to
+// never trigger - see the comment at the setViewportWidth() call site for why "unwrapped" (CSS
+// does it instead) rather than some other specific number.
+private const val UNWRAPPED_WIDTH = Int.MAX_VALUE
 
 private val NAMED_KEYS = setOf("Enter", "Backspace", "PageUp", "PageDown")
 

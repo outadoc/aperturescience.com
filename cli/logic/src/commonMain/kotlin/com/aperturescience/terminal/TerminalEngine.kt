@@ -65,15 +65,25 @@ class TerminalEngine {
     private var gladosMessage = ""
     private val uid = synthesizeUid()
 
-    // Defaults to WRAP_WIDTH so existing behavior (and tests that never call
+    // Defaults to WRAP_WIDTH so existing behavior (and tests/hosts that never call
     // setViewportWidth) is unchanged; a host UI narrower than that must call
     // setViewportWidth before/while booting to avoid the redraw-desync bug described on
     // [reveal].
     private var wrapWidth = WRAP_WIDTH
 
-    /** Narrows future [reveal]-wrapped lines to fit a host terminal thinner than [WRAP_WIDTH]. */
+    /**
+     * Sets the exact column width future [reveal]-wrapped lines are hard-wrapped to - a plain
+     * assignment, not a cap: callers who want [WRAP_WIDTH] as an upper bound (matching the
+     * original's own pixel-wrap threshold, e.g. a real terminal that happens to be wider than
+     * that) apply `minOf(columns, WRAP_WIDTH)` themselves (see `ui-terminal`'s `App.kt`). A host
+     * whose own rendering already reflows text correctly - e.g. `ui-web`'s CSS `white-space:
+     * pre-wrap` - can instead pass something far larger than any real line to suppress this
+     * hard-wrap entirely, so only one layer (its own) is ever deciding where lines actually
+     * break; see `ui-web`'s `Main.kt` for why running both at once, even nominally agreeing on
+     * "100", still produced visibly mismatched wraps in practice.
+     */
     fun setViewportWidth(columns: Int) {
-        if (columns > 0) wrapWidth = minOf(columns, WRAP_WIDTH)
+        if (columns > 0) wrapWidth = columns
     }
 
     fun boot(coroutineScope: CoroutineScope) {
@@ -465,12 +475,16 @@ class TerminalEngine {
      * `^` (the original's newline marker) becomes a line break and `@` (its UID placeholder)
      * is substituted, exactly as `placeText()` did in the source AS2 - this lets strings sourced
      * verbatim from [TerminalData] be passed straight through unmodified. Lines are also
-     * word-wrapped to [wrapWidth] (at most [WRAP_WIDTH]): the original auto-wrapped unbroken
-     * text past a pixel-width threshold too, and without it a single long line soft-wraps in
-     * the real terminal while still animating, which can desync a UI's redraw bookkeeping
-     * (observed with Mosaic) and leave stray duplicate rows behind - the same desync happens
-     * if [wrapWidth] itself is wider than the host terminal's actual column count, which is
-     * why hosts narrower than [WRAP_WIDTH] must report their width via [setViewportWidth].
+     * word-wrapped to [wrapWidth] (see [setViewportWidth] for who sets it to what and why):
+     * defaults to [WRAP_WIDTH], matching the original's own pixel-width auto-wrap threshold.
+     * For a host that redraws by diffing/repositioning a cursor rather than replacing whole-page
+     * content wholesale (observed with Mosaic), a single long line left unwrapped - or wrapped
+     * wider than that host's actual terminal column count - soft-wraps in the real terminal
+     * while still animating, which desyncs the host's own redraw bookkeeping and leaves stray
+     * duplicate rows behind; such a host must keep [wrapWidth] at or below its real column count
+     * via [setViewportWidth]. A host that instead redraws by wholesale-replacing rendered
+     * content (no cursor/diffing involved at all) has no such risk and may leave hard-wrapping
+     * to its own rendering entirely by setting [wrapWidth] far wider than any real line.
      */
     private suspend fun reveal(
         text: String,
@@ -547,7 +561,14 @@ class TerminalEngine {
         private const val NOTES_SPEED = 3
         private const val MAX_INPUT_LENGTH = 65
         private const val PAGE_SIZE = 104
-        private const val WRAP_WIDTH = 100
+
+        /**
+         * Default [wrapWidth], matching the original's own pixel-width auto-wrap threshold.
+         * Public so a CLI-style host can reproduce the "cap at this, never wrap wider" behavior
+         * itself when calling [setViewportWidth] with a real (possibly wider) terminal column
+         * count - see that function's doc.
+         */
+        const val WRAP_WIDTH = 100
         private const val MAX_NOTES_PAGE = 4
 
         private fun isAcceptedChar(c: Char): Boolean =

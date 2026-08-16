@@ -20,9 +20,12 @@ fun App(engine: TerminalEngine) {
     // draws whatever width the content already is, so a host terminal narrower than that
     // desyncs Mosaic's own redraw bookkeeping and leaves stray duplicate rows on screen. Feeding
     // the real column count in here (and on every resize, since this recomposes whenever
-    // LocalTerminalState changes) keeps reveal()'s wrapping honest.
+    // LocalTerminalState changes) keeps reveal()'s wrapping honest. Capped at WRAP_WIDTH even on
+    // a wider terminal: setViewportWidth no longer applies that cap itself (ui-web needs to be
+    // able to opt out of it entirely), so reproducing the original's own pixel-wrap threshold on
+    // a wide terminal is this CLI-specific caller's job now.
     val columns = LocalTerminalState.current.size.columns
-    SideEffect { engine.setViewportWidth(columns) }
+    SideEffect { engine.setViewportWidth(minOf(columns, TerminalEngine.WRAP_WIDTH)) }
 
     LaunchedEffect(Unit) {
         engine.boot(scope)
