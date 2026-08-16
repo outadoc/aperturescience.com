@@ -2,13 +2,13 @@ package com.aperturescience.terminal
 
 import com.aperturescience.terminal.data.QuestionType
 import com.aperturescience.terminal.data.TerminalData
-import kotlin.random.Random
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 /**
  * Faithful port of the state machine in the decompiled `DoAction.as` (AS2) script that drives
@@ -58,8 +58,6 @@ class TerminalEngine {
     private var entryMode = MODE_LOGIN
     private var qon = 0
     private var isCj = false
-    private var applyAIDNum = 0
-    private var applyAIDText = 0
     private var notesPage = 0
     private var pageOffset = 0
     private var gladosHeader = "GLaDOS v1.07 (c) 1982 Aperture Science, Inc."
@@ -186,6 +184,9 @@ class TerminalEngine {
                 } else {
                     advance = text == "PORTAL" || text == "PORTALS"
                 }
+                // The page always advances - a wrong password redisplays this prompt with an
+                // error (qon 3, aliased to 2 above) instead of blocking input; only a correct
+                // password actually unlocks the shell.
                 if (advance) {
                     entryMode = MODE_SHELL
                 } else {
@@ -202,8 +203,6 @@ class TerminalEngine {
             }
             5 -> {
                 if (text == "CONTINUE") {
-                    applyAIDNum = 0
-                    applyAIDText = 90
                     advance = true
                     qon = 0
                     entryMode = MODE_APPLICATION
@@ -217,12 +216,10 @@ class TerminalEngine {
             9 -> {
                 if (text == "THECAKEISALIE") {
                     entryMode = MODE_CAKE
-                    advance = true
-                } else {
-                    qon = 9
-                    advance = true
                 }
+                advance = true
             }
+            // Terminal "does not match" screen - there is no way back from here.
             10 -> advance = false
             else -> advance = true
         }
@@ -247,26 +244,28 @@ class TerminalEngine {
             "THECAKEISALIE" -> entryMode = MODE_CAKE
 
             "DIR", "CATALOG", "DIRECTORY", "LIST", "LS", "CAT" -> {
-                gladosMessage = if (isCj) {
-                    "\nDISK VOLUME 255 [WORKSTATION CJOHNSON]\n\n" +
-                        "     I  019  APPLY.EXE\n     I  004  NOTES.EXE\n\n" +
-                        "2 FILE(S) IN 23 BLOCKS\n"
-                } else {
-                    "\nDISK VOLUME 255 [NEW EMPLOYEE WORKSTATION]\n\n" +
-                        "     I  019  APPLY.EXE\n\n1 FILE(S) IN 19 BLOCKS\n"
-                }
+                gladosMessage =
+                    if (isCj) {
+                        "\nDISK VOLUME 255 [WORKSTATION CJOHNSON]\n\n" +
+                            "     I  019  APPLY.EXE\n     I  004  NOTES.EXE\n\n" +
+                            "2 FILE(S) IN 23 BLOCKS\n"
+                    } else {
+                        "\nDISK VOLUME 255 [NEW EMPLOYEE WORKSTATION]\n\n" +
+                            "     I  019  APPLY.EXE\n\n1 FILE(S) IN 19 BLOCKS\n"
+                    }
             }
 
             "IP" -> gladosMessage = " \n\nuid:$uid\n"
 
             "HELP", "LIB", "?" -> {
-                gladosMessage = if (isCj) {
-                    " \n\nLIB\n     NOTES\n     APPEND\n     ATTRIB\n     COPY\n     DIR\n     ERASE\n" +
-                        "     FORMAT\n     INTERROGATE\n     LIB\n     PLAY\n     RENAME\n     TAPEDISK"
-                } else {
-                    " \n\nLIB\n     APPEND\n     ATTRIB\n     COPY\n     DIR\n     ERASE\n     FORMAT\n" +
-                        "     INTERROGATE\n     LIB\n     PLAY\n     RENAME\n     TAPEDISK"
-                }
+                gladosMessage =
+                    if (isCj) {
+                        " \n\nLIB\n     NOTES\n     APPEND\n     ATTRIB\n     COPY\n     DIR\n     ERASE\n" +
+                            "     FORMAT\n     INTERROGATE\n     LIB\n     PLAY\n     RENAME\n     TAPEDISK"
+                    } else {
+                        " \n\nLIB\n     APPEND\n     ATTRIB\n     COPY\n     DIR\n     ERASE\n     FORMAT\n" +
+                            "     INTERROGATE\n     LIB\n     PLAY\n     RENAME\n     TAPEDISK"
+                    }
             }
 
             "LOGOUT", "BYE", "LOGOFF", "VALVE" -> {
@@ -277,19 +276,22 @@ class TerminalEngine {
             "APPEND", "ATTRIB", "COPY", "FORMAT", "ERASE", "RENAME" ->
                 gladosMessage = "\n\nERROR 15 [Disk is write protected]"
 
-            "PLAY" -> when {
-                args.size == 1 -> gladosMessage = "\n\nERROR 03 [What would you like to play?]"
-                args.getOrNull(1) == "PORTAL" -> {
-                    farewell("http://www.youtube.com/watch?v=0h50K2NVJHM")
-                    return
+            "PLAY" ->
+                when {
+                    args.size == 1 -> gladosMessage = "\n\nERROR 03 [What would you like to play?]"
+                    args.getOrNull(1) == "PORTAL" -> {
+                        farewell("http://www.youtube.com/watch?v=0h50K2NVJHM")
+                        return
+                    }
                 }
-            }
 
-            "INTERROGATE" -> gladosMessage = when {
-                args.size == 1 -> "\n\nERROR 02 [Command requires at least one parameter]"
-                isCj -> "\n\nERROR 07 [Unknown Employee]"
-                else -> "\n\nERROR 01 [Illegal attempt to initiate disciplinary action]"
-            }
+            "INTERROGATE" ->
+                gladosMessage =
+                    when {
+                        args.size == 1 -> "\n\nERROR 02 [Command requires at least one parameter]"
+                        isCj -> "\n\nERROR 07 [Unknown Employee]"
+                        else -> "\n\nERROR 01 [Illegal attempt to initiate disciplinary action]"
+                    }
 
             "TAPEDISK" -> gladosMessage = "\n\nERROR 18 [User not authorized to transfer system tapes]"
 
@@ -334,10 +336,8 @@ class TerminalEngine {
             val choice = text.toIntOrNull()
             if (choice != null && choice > 0 && choice <= question.choices.size) {
                 advance = true
-                applyAIDNum++
             }
         } else if (qon != 51) {
-            applyAIDText++
             advance = true
         }
         if (text == "QUIT") {
@@ -391,7 +391,7 @@ class TerminalEngine {
                 qon++
                 showQuestion()
             }
-            MODE_BOSSKEY -> revealInstant(bosskeyScreen())
+            MODE_BOSSKEY -> revealInstant(BOSSKEY_SPREADSHEET)
             MODE_CAKE -> {
                 reveal(CAKE_MONOLOGUE_1, 0, unlockAfter = false)
                 delay(2000) // stand-in for security02.flv playback
@@ -413,19 +413,21 @@ class TerminalEngine {
         val total = question.choices.size
         val padWidth = (total + 1).toString().length
         val pageEnd = minOf(pageOffset + PAGE_SIZE, total)
-        val body = buildString {
-            for (i in pageOffset until pageEnd) {
-                append((i + 1).toString().padStart(padWidth, '0'))
-                append("] ")
-                append(question.choices[i])
-                append('\n')
+        val body =
+            buildString {
+                for (i in pageOffset until pageEnd) {
+                    append((i + 1).toString().padStart(padWidth, '0'))
+                    append("] ")
+                    append(question.choices[i])
+                    append('\n')
+                }
             }
-        }
-        val prompt = if (total > PAGE_SIZE) {
-            "[$total total choices : PGUP/PGDN to navigate]> "
-        } else {
-            "> "
-        }
+        val prompt =
+            if (total > PAGE_SIZE) {
+                "[$total total choices : PGUP/PGDN to navigate]> "
+            } else {
+                "> "
+            }
         revealInstant(body + prompt)
     }
 
@@ -433,8 +435,6 @@ class TerminalEngine {
         entryMode = if (entryMode == MODE_CAKE) MODE_BOSSKEY else MODE_CAKE
         showNextPage()
     }
-
-    private fun bosskeyScreen(): String = BOSSKEY_SPREADSHEET
 
     private suspend fun farewell(url: String) {
         clearScreen()
@@ -459,7 +459,11 @@ class TerminalEngine {
      * still animating, which can desync a UI's redraw bookkeeping (observed with Mosaic) and
      * leave stray duplicate rows behind.
      */
-    private suspend fun reveal(text: String, delayMs: Int, unlockAfter: Boolean = true) {
+    private suspend fun reveal(
+        text: String,
+        delayMs: Int,
+        unlockAfter: Boolean = true,
+    ) {
         val logicalLines = text.replace("@", "[$uid]").replace("^", "\n").split("\n")
         val lines = logicalLines.flatMap { wordWrap(it, WRAP_WIDTH) }
         for ((index, line) in lines.withIndex()) {
@@ -489,7 +493,10 @@ class TerminalEngine {
     /** Reveals every line instantly, appending onto [pageContent] (see [reveal]). */
     private suspend fun revealInstant(text: String) = reveal(text, 0)
 
-    private fun wordWrap(line: String, width: Int): List<String> {
+    private fun wordWrap(
+        line: String,
+        width: Int,
+    ): List<String> {
         if (line.length <= width) return listOf(line)
         val result = mutableListOf<String>()
         val current = StringBuilder()
@@ -534,7 +541,9 @@ class TerminalEngine {
             c.isDigit() || c.uppercaseChar() in 'A'..'Z' || c == ' ' || c == '?'
 
         private fun isAcceptedRawKey(key: String): Boolean =
-            key == "Enter" || key == "Backspace" || key == " " ||
+            key == "Enter" ||
+                key == "Backspace" ||
+                key == " " ||
                 (key.length == 1 && isAcceptedChar(key[0]))
 
         private fun synthesizeUid(): String {
@@ -544,29 +553,32 @@ class TerminalEngine {
             }
         }
 
-        private val CAKE_MONOLOGUE_1 = listOf(
-            ">",
-            ">>>&!>>",
-            "When was the last time you left the building?",
-            "Has anybody left the building lately?",
-            "I don't know why we're in lockdown. I don't know who's in charge.",
-            "I did find out a few things, like these terminals don't have to",
-            "tap out characters one at a time. And while we're all working",
-            "on twenty year old equipment, somehow they can afford to build",
-            "an 'Enrichment Center'. Check out this security feed.",
-            "Whatever the hell a 'relaxation vault' is, it",
-            "doesn't have any doors.",
-            "",
-            "[security02.flv would play here]",
-            "",
-        ).joinToString("\n")
+        private val CAKE_MONOLOGUE_1 =
+            listOf(
+                ">",
+                ">>>&!>>",
+                "When was the last time you left the building?",
+                "Has anybody left the building lately?",
+                "I don't know why we're in lockdown. I don't know who's in charge.",
+                "I did find out a few things, like these terminals don't have to",
+                "tap out characters one at a time. And while we're all working",
+                "on twenty year old equipment, somehow they can afford to build",
+                "an 'Enrichment Center'. Check out this security feed.",
+                "Whatever the hell a 'relaxation vault' is, it",
+                "doesn't have any doors.",
+                "",
+                "[security02.flv would play here]",
+                "",
+            ).joinToString("\n")
 
-        private val CAKE_MONOLOGUE_2 = listOf(
-            "I don't think going home is part of our job description anymore.",
-            "If a supervisor walks by, press return!",
-        ).joinToString("\n")
+        private val CAKE_MONOLOGUE_2 =
+            listOf(
+                "I don't think going home is part of our job description anymore.",
+                "If a supervisor walks by, press return!",
+            ).joinToString("\n")
 
-        private val BOSSKEY_SPREADSHEET = """
+        private val BOSSKEY_SPREADSHEET =
+            """
             B8    (L) TOTAL
                 A         B          C          D          E
              1
@@ -577,6 +589,6 @@ class TerminalEngine {
              6  TACK-THMB         75       0.02        1.50
              7                                    ----------
              8  TOTAL                     976,076.49
-        """.trimIndent() + "\n"
+            """.trimIndent() + "\n"
     }
 }

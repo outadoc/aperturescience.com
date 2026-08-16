@@ -40,10 +40,11 @@ fun main() {
         // the composition ourselves when it fires - the same graceful, cooperative shutdown, just
         // triggered from our side instead of Mosaic's.
         val mosaicJob = launch { runMosaic { App(engine) } }
-        val watcherJob = launch {
-            engine.exitRequested.first { it }
-            mosaicJob.cancel()
-        }
+        val watcherJob =
+            launch {
+                engine.exitRequested.first { it }
+                mosaicJob.cancel()
+            }
         mosaicJob.join()
         watcherJob.cancel()
     }
