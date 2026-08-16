@@ -4,7 +4,7 @@ import json
 import sys
 
 SRC = "/var/home/outadoc/dev/projects/web/aperturescience.com/decompiled/terminal_data.json"
-DST = "/var/home/outadoc/dev/projects/web/aperturescience.com/cli/logic/src/main/kotlin/com/aperturescience/terminal/data/TerminalData.kt"
+DST = "/var/home/outadoc/dev/projects/web/aperturescience.com/cli/logic/src/commonMain/kotlin/com/aperturescience/terminal/data/TerminalData.kt"
 
 TYPE_MAP = {"T": "TEXT", "C": "CHECKBOX", "R": "RADIO"}
 

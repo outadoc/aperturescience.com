@@ -110,7 +110,7 @@ class LoginFlowTest {
         }
 
     @Test
-    fun `CJOHNSON requires TIER3, not PORTAL, on the first attempt`() =
+    fun `CJOHNSON requires TIER3 - not PORTAL - on the first attempt`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
             submit(engine, "LOGON")
@@ -120,7 +120,7 @@ class LoginFlowTest {
         }
 
     @Test
-    fun `a failed CJOHNSON attempt drops admin status, so PORTAL then works as a regular user`() =
+    fun `a failed CJOHNSON attempt drops admin status - so PORTAL then works as a regular user`() =
         runTest {
             // This mirrors a real quirk in the original: is_cj is reset to false as soon as a TIER3
             // attempt fails, so the very next attempt is evaluated as a regular (non-admin) login.
@@ -136,7 +136,7 @@ class LoginFlowTest {
         }
 
     @Test
-    fun `password entry is echoed as asterisks, not the typed characters`() =
+    fun `password entry is echoed as asterisks - not the typed characters`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
             submit(engine, "LOGON")

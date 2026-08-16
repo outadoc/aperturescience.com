@@ -156,7 +156,7 @@ class ShellCommandsTest {
         }
 
     @Test
-    fun `a period cannot be typed at all, so NOTES-EXE degrades to NOTESEXE`() =
+    fun `a period cannot be typed at all - so NOTES-EXE degrades to NOTESEXE`() =
         runTest {
             // "." isn't in the accepted-character set (faithfully matching the original, which also
             // has no period key in its keyCode allowlist) - so "NOTES.EXE" can never actually be
@@ -193,7 +193,7 @@ class ShellCommandsTest {
         }
 
     @Test
-    fun `a period cannot be typed at all, so APPLY-EXE degrades to APPLYEXE`() =
+    fun `a period cannot be typed at all - so APPLY-EXE degrades to APPLYEXE`() =
         runTest {
             // Same period-is-unreachable quirk as NOTES.EXE - "APPLY.EXE" can never actually be typed.
             val engine = loginToShell()
@@ -213,7 +213,7 @@ class ShellCommandsTest {
         }
 
     @Test
-    fun `PLAY PORTAL also ends the session, pointing at the trailer`() =
+    fun `PLAY PORTAL also ends the session - pointing at the trailer`() =
         runTest {
             val engine = loginToShell()
             submit(engine, "PLAY PORTAL")

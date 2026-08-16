@@ -36,7 +36,7 @@ class NotesExeTest {
         }
 
     @Test
-    fun `any accepted key advances a page, not only Enter`() =
+    fun `any accepted key advances a page - not only Enter`() =
         runTest {
             val engine = loginAsAdmin()
             submit(engine, "NOTES")

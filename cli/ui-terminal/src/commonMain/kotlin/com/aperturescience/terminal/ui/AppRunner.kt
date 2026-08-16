@@ -13,22 +13,22 @@ import kotlinx.coroutines.runBlocking
 private const val ENTER_ALT_SCREEN = "[?1049h[H"
 private const val LEAVE_ALT_SCREEN = "[?1049l"
 
-fun main() {
+/**
+ * Shared entry point for every target's `main()`: enters the alternate screen buffer, drives
+ * Mosaic/[TerminalEngine] to completion, and leaves the alternate screen buffer again - via
+ * [installTerminationHandler] rather than only a plain `finally`, since that also has to cover
+ * exits that bypass normal Kotlin control flow entirely (SIGTERM/SIGHUP from outside the
+ * process). Nothing here ever calls `exitProcess()`/`System.exit()`: every exit path is a normal,
+ * cooperative coroutine completion, so a platform's `main()` returning is always enough.
+ */
+fun runTerminalApp() {
     print(ENTER_ALT_SCREEN)
-    System.out.flush()
+    flushStdout()
 
-    // A shutdown hook (rather than only a try/finally below) is kept as a fallback for exits
-    // that bypass normal Kotlin control flow entirely - e.g. SIGTERM/SIGHUP from outside the
-    // process (closing the terminal window, `kill <pid>`). Neither this program nor
-    // TerminalEngine ever calls exitProcess()/System.exit() itself (that would be fatal to embed
-    // in a test suite or a server) - every exit path below is a normal, cooperative coroutine
-    // completion, so this hook is purely a safety net for signals it can't otherwise observe.
-    Runtime.getRuntime().addShutdownHook(
-        Thread {
-            print(LEAVE_ALT_SCREEN)
-            System.out.flush()
-        },
-    )
+    installTerminationHandler {
+        print(LEAVE_ALT_SCREEN)
+        flushStdout()
+    }
 
     runBlocking {
         val engine = TerminalEngine()

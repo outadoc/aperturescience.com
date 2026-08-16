@@ -1,25 +1,41 @@
 plugins {
-    kotlin("jvm")
-    kotlin("plugin.compose")
-    application
-    id("com.gradleup.shadow")
-}
-
-dependencies {
-    implementation(project(":logic"))
-    implementation("com.jakewharton.mosaic:mosaic-runtime:0.18.0")
-    testImplementation(kotlin("test"))
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.kotlin.plugin.compose)
+    alias(libs.plugins.shadow)
 }
 
 kotlin {
     jvmToolchain(21)
+
+    jvm {
+        // Replaces the plain `kotlin("jvm")` + `application` plugin combo (incompatible with
+        // Kotlin Multiplatform): this is the KMP/JVM binaries DSL's equivalent of
+        // `application { mainClass.set(...) }`, and it's also what the shadow plugin's KMP
+        // support reads its `shadowJar.mainClass` convention from.
+        mainRun {
+            mainClass.set("com.aperturescience.terminal.ui.MainKt")
+        }
+    }
+    linuxX64 {
+        binaries {
+            executable {
+                entryPoint = "com.aperturescience.terminal.ui.main"
+            }
+        }
+    }
+
+    sourceSets {
+        commonMain.dependencies {
+            implementation(project(":logic"))
+            implementation(libs.mosaic.runtime)
+        }
+        commonTest.dependencies {
+            implementation(libs.kotlin.test)
+        }
+    }
 }
 
-application {
-    mainClass.set("com.aperturescience.terminal.ui.MainKt")
-}
-
-tasks.test {
+tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 

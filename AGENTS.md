@@ -50,18 +50,24 @@ screen. All logic and text lives in a single ~4300-line AS2 script
   `qar[]`, `qdelay[]` array assignments out of `DoAction.as` into
   `decompiled/terminal_data.json`. Regenerate this if re-exporting the SWF.
 - `scripts/gen_kotlin_data.py` — generates
-  `cli/logic/src/main/kotlin/com/aperturescience/terminal/data/TerminalData.kt`
+  `cli/logic/src/commonMain/kotlin/com/aperturescience/terminal/data/TerminalData.kt`
   from that JSON (verbatim string literals, escaped for Kotlin). This file
   is committed as a generated artifact — do not hand-edit it, rerun the
   script instead.
-- `cli/` — the Kotlin reimplementation (Gradle, Kotlin/JVM). Two modules:
-  `cli/logic/` (the whole state machine, `TerminalEngine.kt` +
-  `data/TerminalData.kt` — plain Kotlin/coroutines, zero dependency on
-  Mosaic/Compose or any other UI framework) and `cli/ui-terminal/`
-  (`Main.kt`/`App.kt`, the Mosaic-based UI + `application`/shadow-jar setup,
-  depends on `:logic`). Builds and runs on the host directly (Gradle 9.7 /
-  JDK — no distrobox needed for this half of the project, only for
-  decompilation).
+- `cli/` — the Kotlin reimplementation (Gradle, Kotlin Multiplatform: `jvm()`
+  + `linuxX64()` targets, version catalog at `cli/gradle/libs.versions.toml`).
+  Two modules: `cli/logic/` (the whole state machine, `TerminalEngine.kt` +
+  `data/TerminalData.kt` in `src/commonMain/` — plain Kotlin/coroutines, zero
+  dependency on Mosaic/Compose or any other UI framework; tests in
+  `src/commonTest/` run on both targets) and `cli/ui-terminal/` (the
+  Mosaic-based UI, depends on `:logic`; `App.kt`/`AppRunner.kt`/`Platform.kt`
+  live in `src/commonMain/`, with a tiny per-target `Main.kt` +
+  `Platform.kt` actual in `src/jvmMain/` and `src/nativeMain/` — see "UI
+  toolkit: Mosaic" below for why the platform split exists at all). Builds
+  and runs on the host directly (Gradle 9.7 / JDK — no distrobox needed for
+  this half of the project, only for decompilation). `:ui-terminal:shadowJar`
+  produces the JVM fat jar; `:ui-terminal:linkReleaseExecutableLinuxX64`
+  produces a standalone native Linux binary that needs no JVM at all.
 
 ## Reimplementation plan (Kotlin CLI, `cli/`)
 
@@ -173,20 +179,31 @@ things worth knowing:
     actually waits on, it is not "no more suspended `LaunchedEffect`s in the
     tree" in the way that pattern assumes.)
 - Mosaic has no built-in alternate-screen-buffer support (confirmed: no
-  `1049` anywhere in its source), so `Main.kt` drives it directly - writes
-  `ESC[?1049h` (enter) before entering `runBlocking` and registers a
-  `Runtime.addShutdownHook` that writes `ESC[?1049l` (leave). This is what
-  makes the whole *terminal* (not just our own drawn region) clear on
-  startup and restores whatever was there before on exit, like vim/htop.
-  The shutdown hook (rather than only a `try`/`finally`) is kept as a
-  fallback for exits that bypass normal Kotlin control flow entirely - e.g.
-  SIGTERM/SIGHUP from outside the process - since every in-process exit path
-  is now cooperative and would hit a `finally` anyway.
-  Verified via `tmux`: pre-existing shell content is hidden on launch and
-  exactly restored (plus the shell's own record of the launch command) after
-  exit via Ctrl+C (idle, mid-animation, and from inside the cake/bosskey
-  loop), `LOGOUT`, and `PLAY PORTAL`, with the terminal left in a normal,
-  working state afterward.
+  `1049` anywhere in its source), so `AppRunner.kt` (`runTerminalApp()`,
+  shared `commonMain` code called from each target's tiny `Main.kt`) drives
+  it directly - writes `ESC[?1049h` (enter) before entering `runBlocking`
+  and calls `installTerminationHandler { ... ESC[?1049l ... }` to register
+  the "leave" side. This is what makes the whole *terminal* (not just our
+  own drawn region) clear on startup and restores whatever was there before
+  on exit, like vim/htop. `installTerminationHandler`/`flushStdout` are
+  `expect`/`actual` (`Platform.kt`) since the underlying mechanism is
+  necessarily platform-specific: on JVM, a `Runtime.addShutdownHook`, which
+  the JVM itself runs on every exit path including a normal return from
+  `main()`; on `linuxX64` (Kotlin/Native, via `kotlinx.cinterop`/
+  `platform.posix`), `atexit()` covers the normal-return case the same way,
+  plus `signal(SIGTERM/SIGHUP) { exit(0) }` so an external signal reaches
+  `exit()` (which runs the `atexit` handler) instead of terminating the
+  process without unwinding. Kept as a dedicated hook (rather than only a
+  `try`/`finally`) as a fallback for exits that bypass normal Kotlin control
+  flow entirely - e.g. SIGTERM/SIGHUP from outside the process - since every
+  in-process exit path is now cooperative and would hit a `finally` anyway.
+  Verified via `tmux` on both the JVM shadow jar and the native `linuxX64`
+  binary: pre-existing shell content is hidden on launch and exactly
+  restored (plus the shell's own record of the launch command) after exit
+  via Ctrl+C (idle, mid-animation, and from inside the cake/bosskey loop),
+  `LOGOUT`, `PLAY PORTAL`, and (native binary only, to specifically exercise
+  the `signal()` path) an external `kill -TERM`, with the terminal left in a
+  normal, working state afterward.
 
 ## Status (2026-08-16)
 
@@ -224,8 +241,9 @@ things worth knowing:
   (`security02.flv` isn't reproduced); cosmetic-only effects (glitching UID
   digits, random cake-image flicker) are skipped.
 - `cli/logic` has an automated unit test suite (`kotlin.test` +
-  `kotlinx-coroutines-test`, `./gradlew :logic:test`): 76 tests across
-  `LoginFlowTest`, `ShellCommandsTest`, `ApplicationWizardTest`,
+  `kotlinx-coroutines-test`, `./gradlew :logic:allTests` - runs on both the
+  `jvm` and `linuxX64` targets since the tests live in `src/commonTest/`):
+  76 tests across `LoginFlowTest`, `ShellCommandsTest`, `ApplicationWizardTest`,
   `NotesExeTest`, `CakeBosskeyTest`, `InputHandlingTest`. Drives
   `TerminalEngine` through `TestScope`/`runTest`'s virtual time, so the
   whole suite runs in well under a second despite exercising every typewriter
@@ -242,3 +260,10 @@ things worth knowing:
     matching the original's keyCode allowlist which also has no period key
     - so typing either one actually submits `APPLYEXE`/`NOTESEXE`, which
     don't match anything and fall through to the unknown-command error.
+  - Porting the test suite to also run on `linuxX64` surfaced a Kotlin/Native
+    quirk: backtick-named `@Test` functions containing a comma fail to
+    compile there ("Name contains illegal characters") even though the same
+    name compiles and runs fine on the JVM - Kotlin/Native mangles test
+    names into binary symbols, which have a narrower allowed character set
+    than a JVM method name does. Existing test names were reworded to use
+    ` - ` instead of `,`; keep that in mind for new backtick-named tests.

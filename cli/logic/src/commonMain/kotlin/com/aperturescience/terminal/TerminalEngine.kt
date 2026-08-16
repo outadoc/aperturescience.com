@@ -108,7 +108,7 @@ class TerminalEngine {
             key == "Enter" -> scope.launch { handleEnter() }
             key == "Backspace" -> {
                 if (input.isNotEmpty()) {
-                    input.deleteCharAt(input.length - 1)
+                    input.deleteAt(input.length - 1)
                     updateLiveLine()
                 }
             }
