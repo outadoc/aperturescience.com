@@ -390,7 +390,7 @@ class TerminalEngine {
                 delay(2000) // stand-in for security02.flv playback
                 reveal(CAKE_MONOLOGUE_2, 0)
             }
-            MODE_NOTES -> revealInstant(TerminalData.cjHistory[notesPage - 1] + "\n\n[press ENTER to continue]")
+            MODE_NOTES -> reveal(TerminalData.cjHistory[notesPage - 1] + "\n\n[press ENTER to continue]", NOTES_SPEED)
         }
     }
 
@@ -516,6 +516,7 @@ class TerminalEngine {
         private const val MODE_NOTES = 5
 
         private const val GLADOS_SPEED = 7
+        private const val NOTES_SPEED = 3
         private const val MAX_INPUT_LENGTH = 65
         private const val PAGE_SIZE = 104
         private const val WRAP_WIDTH = 100

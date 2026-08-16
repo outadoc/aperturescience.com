@@ -134,6 +134,21 @@ terminal library — `kotlin("plugin.compose")` + Compose `remember`/
   Ctrl+C before any lock/mode-specific early return, so it always works -
   including mid-typewriter-animation and inside the cake/bosskey loop, which
   otherwise has no in-story way back to the shell.
+- Mosaic has no built-in alternate-screen-buffer support (confirmed: no
+  `1049` anywhere in its source), so `Main.kt` drives it directly - writes
+  `ESC[?1049h` (enter) before `runMosaicBlocking` starts and registers a
+  `Runtime.addShutdownHook` that writes `ESC[?1049l` (leave). This is what
+  makes the whole *terminal* (not just our own drawn region) clear on
+  startup and restores whatever was there before on exit, like vim/htop. A
+  shutdown hook, not a `try`/`finally` around `runMosaicBlocking`, is
+  required: `TerminalEngine`'s exit paths call `exitProcess()` from inside a
+  coroutine (Ctrl+C, `LOGOUT`, `PLAY PORTAL`), which never unwinds back
+  through `main()`'s call stack - `System.exit()` still runs shutdown hooks
+  though, so that's the one place that reliably fires on every exit path.
+  Verified via `tmux`: pre-existing shell content is hidden on launch and
+  exactly restored (plus the shell's own record of the launch command) after
+  exit via both Ctrl+C and `LOGOUT`, with the terminal left in a normal,
+  working state afterward.
 
 ## Status (2026-08-16)
 

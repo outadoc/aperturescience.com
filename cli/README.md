@@ -30,6 +30,11 @@ or build a standalone fat jar:
 java -jar build/libs/aperturescience-terminal-0.1.0-all.jar
 ```
 
+The program takes over the whole terminal on launch, like `vim` or `htop`
+(using the terminal's alternate-screen buffer) — whatever was on screen
+before is hidden while it runs and comes back exactly as it was when it
+exits.
+
 Press **Ctrl+C** at any time to exit — including from the `THECAKEISALIE`
 easter egg loop, which otherwise has no scripted way back to the shell (this
 matches the original: your only real exit there was closing the browser tab).
