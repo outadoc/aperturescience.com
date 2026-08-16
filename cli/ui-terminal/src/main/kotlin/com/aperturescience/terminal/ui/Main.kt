@@ -1,4 +1,4 @@
-package com.aperturescience.terminal
+package com.aperturescience.terminal.ui
 
 import com.jakewharton.mosaic.runMosaicBlocking
 

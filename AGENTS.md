@@ -50,13 +50,18 @@ screen. All logic and text lives in a single ~4300-line AS2 script
   `qar[]`, `qdelay[]` array assignments out of `DoAction.as` into
   `decompiled/terminal_data.json`. Regenerate this if re-exporting the SWF.
 - `scripts/gen_kotlin_data.py` — generates
-  `cli/src/main/kotlin/com/aperturescience/terminal/data/TerminalData.kt`
+  `cli/logic/src/main/kotlin/com/aperturescience/terminal/data/TerminalData.kt`
   from that JSON (verbatim string literals, escaped for Kotlin). This file
   is committed as a generated artifact — do not hand-edit it, rerun the
   script instead.
-- `cli/` — the Kotlin reimplementation (Gradle, Kotlin/JVM, `application`
-  plugin). Builds and runs on the host directly (Gradle 9.7 / JDK — no
-  distrobox needed for this half of the project, only for decompilation).
+- `cli/` — the Kotlin reimplementation (Gradle, Kotlin/JVM). Two modules:
+  `cli/logic/` (the whole state machine, `TerminalEngine.kt` +
+  `data/TerminalData.kt` — plain Kotlin/coroutines, zero dependency on
+  Mosaic/Compose or any other UI framework) and `cli/ui-terminal/`
+  (`Main.kt`/`App.kt`, the Mosaic-based UI + `application`/shadow-jar setup,
+  depends on `:logic`). Builds and runs on the host directly (Gradle 9.7 /
+  JDK — no distrobox needed for this half of the project, only for
+  decompilation).
 
 ## Reimplementation plan (Kotlin CLI, `cli/`)
 
@@ -95,15 +100,19 @@ stale rather than trusting a paraphrase.
 
 ## UI toolkit: Mosaic
 
-The CLI is built on [Mosaic](https://github.com/JakeWharton/mosaic)
+`cli/ui-terminal/` is built on [Mosaic](https://github.com/JakeWharton/mosaic)
 (`com.jakewharton.mosaic:mosaic-runtime:0.18.0`), a Jetpack-Compose-for-the-
 terminal library — `kotlin("plugin.compose")` + Compose `remember`/
-`mutableStateOf`/`LaunchedEffect` drive the UI. Two things worth knowing:
+`mutableStateOf`/`LaunchedEffect` drive `App.kt`. None of this reaches
+`cli/logic/`: `TerminalEngine` exposes its screen content as a plain
+`StateFlow<String>` (`liveLine`) with zero Compose/Mosaic coupling; `App.kt`
+is what binds it to a `@Composable Text()`, via `collectAsState()`. Two
+things worth knowing:
 
 - Requires `mavenCentral()` **and** `google()` repositories (transitive
   `androidx.lifecycle`/`androidx.annotation` artifacts).
-- The whole current page (`TerminalEngine.pageContent`/`liveLine`) is a
-  single dynamic `@Composable` `Text()` bound to Compose state, **not**
+- `App.kt`'s whole current page is a single dynamic `@Composable` `Text()`
+  bound to `engine.liveLine.collectAsState()`, **not**
   `LocalStaticLogger`/`StaticEffect` (Mosaic's Ink.js-style "permanent,
   never-redrawn scrollback" mechanism — there's no such thing in the
   original, which always clears and redraws its whole canvas, so a
@@ -113,7 +122,11 @@ terminal library — `kotlin("plugin.compose")` + Compose `remember`/
   wholesale is exactly what makes Mosaic erase the old (possibly taller)
   page and redraw the new one — this *is* the clear-and-redraw effect,
   achieved through Mosaic's own diffing rather than manual ANSI clear
-  codes, which would desync its redraw bookkeeping.
+  codes, which would desync its redraw bookkeeping. `TerminalEngine` itself
+  builds that same full-page string internally (`pageContent`) before
+  publishing it to `liveLine` — that accumulation logic lives in `logic` and
+  has nothing to do with Mosaic; only the `Text()`/`collectAsState()` side
+  in `ui-terminal` is Mosaic-specific.
 - Word-wrap unbroken text to `WRAP_WIDTH` before animating it
   (`TerminalEngine.wordWrap`, porting the original's own pixel-width
   auto-wrap). Without it, a single long line can soft-wrap in the real
@@ -128,12 +141,19 @@ terminal library — `kotlin("plugin.compose")` + Compose `remember`/
   `onKeyEvent` in the tree already reported the key as handled - and only
   when the *ctrl* modifier is actually checked. `KeyEvent("c", ctrl = true)`
   and a plain lowercase `c` keypress both have `key == "c"`; if you only look
-  at `.key` (as `App.kt` originally did) Ctrl+C is indistinguishable from
-  typing the letter C and gets swallowed as text input. `TerminalEngine.
-  onKeyEvent` now takes `ctrl: Boolean` explicitly and exits immediately on
-  Ctrl+C before any lock/mode-specific early return, so it always works -
-  including mid-typewriter-animation and inside the cake/bosskey loop, which
-  otherwise has no in-story way back to the shell.
+  at `.key` Ctrl+C is indistinguishable from typing the letter C and gets
+  swallowed as text input. `App.kt`'s `onKeyEvent` modifier checks
+  `event.ctrl && event.key == "c"` and calls `exitProcess(0)` directly,
+  *before* ever calling `engine.onKeyEvent(...)` - so it always works,
+  unconditionally, regardless of the engine's internal lock/mode state,
+  including mid-typewriter-animation and inside the cake/bosskey loop (which
+  otherwise has no in-story way back to the shell). This is deliberately a
+  UI-layer concern, not `TerminalEngine`'s: Ctrl+C is our own escape hatch,
+  not part of the original terminal's modeled behavior, unlike `LOGOUT`/
+  `PLAY PORTAL` (faithfully-ported in-game commands that also call
+  `exitProcess()`, but from inside `TerminalEngine.farewell()` since exiting
+  really is what the original scripted for those). `TerminalEngine.
+  onKeyEvent` takes only a plain `key: String` - no `ctrl` parameter at all.
 - Mosaic has no built-in alternate-screen-buffer support (confirmed: no
   `1049` anywhere in its source), so `Main.kt` drives it directly - writes
   `ESC[?1049h` (enter) before `runMosaicBlocking` starts and registers a
@@ -153,12 +173,20 @@ terminal library — `kotlin("plugin.compose")` + Compose `remember`/
 ## Status (2026-08-16)
 
 - Decompilation, data extraction, and Kotlin scaffold: done (see above).
-- State machine (`TerminalEngine.kt`): **implemented** — login/username/
-  password (incl. `CJOHNSON`/`TIER3` admin unlock and masked password entry),
-  GLaDOS shell commands, the 50-question application wizard (incl. the
-  original's off-by-one where question 50's answer is discarded), NOTES.EXE
-  paging, and the `THECAKEISALIE` ⇄ bosskey toggle loop. `App.kt` wires it to
-  Mosaic; `Main.kt` is the entry point.
+- State machine (`cli/logic/.../TerminalEngine.kt`): **implemented** —
+  login/username/password (incl. `CJOHNSON`/`TIER3` admin unlock and masked
+  password entry), GLaDOS shell commands, the 50-question application wizard
+  (incl. the original's off-by-one where question 50's answer is discarded),
+  NOTES.EXE paging, and the `THECAKEISALIE` ⇄ bosskey toggle loop.
+  `cli/ui-terminal/.../App.kt` wires it to Mosaic; `Main.kt` is the entry
+  point.
+- Split into two Gradle modules (`cli/logic`, no UI dependency at all — not
+  even transitively, verified via `./gradlew :logic:dependencies` — and
+  `cli/ui-terminal`, the Mosaic UI, depends on `:logic`). The only change
+  this forced in `TerminalEngine` itself: `liveLine` went from a Compose
+  `mutableStateOf`-delegated property to a plain `StateFlow<String>`
+  (`MutableStateFlow` internally); `isLocked` had no external reader at all
+  so it's now a fully private plain `var`. See "UI toolkit: Mosaic" above.
 - Verified interactively via `tmux` end-to-end: full login, admin login,
   DIR/HELP/IP/unknown-command shell errors, APPLY through several questions
   (text + choice types, invalid-choice rejection), QUIT-from-questionnaire,

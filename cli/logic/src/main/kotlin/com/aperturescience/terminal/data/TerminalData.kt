@@ -1,7 +1,7 @@
 // GENERATED FILE — do not edit by hand.
 // Source data extracted verbatim from the decompiled ActionScript
 // (DoAction.as) of ApertureScience17 (2007-10-17).swf via
-// ../scripts/gen_kotlin_data.py. Regenerate rather than hand-edit.
+// scripts/gen_kotlin_data.py (from repo root). Regenerate rather than hand-edit.
 package com.aperturescience.terminal.data
 
 enum class QuestionType { TEXT, CHECKBOX, RADIO }

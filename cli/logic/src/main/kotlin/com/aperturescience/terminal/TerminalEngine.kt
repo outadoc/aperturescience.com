@@ -1,14 +1,13 @@
 package com.aperturescience.terminal
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import com.aperturescience.terminal.data.QuestionType
 import com.aperturescience.terminal.data.TerminalData
 import kotlin.random.Random
-import kotlin.system.exitProcess
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 /**
@@ -16,6 +15,10 @@ import kotlinx.coroutines.launch
  * ApertureScience17 (2007-10-17).swf. Mirrors that script's `entryMode`/`qon` state pair and its
  * `processInput0/1/2/5`, `switchPage`, `formatQuestion`, `thecakeisalie`, `bosskey`, and
  * `notesdisplay` functions closely enough that behavior (including its quirks) should match.
+ *
+ * This class has no UI dependency of any kind - [liveLine] is a plain [StateFlow] any front end
+ * can collect, and [onKeyEvent] takes a plain key name. Ctrl+C is handled by the UI layer, not
+ * here - it's our own escape hatch, not part of the original terminal's modeled behavior.
  *
  * Rendering matches the original's `clearScreen()`-then-redraw model: every new page wipes
  * [pageContent] and rebuilds it from scratch, exactly like the original wiped its Flash canvas
@@ -25,15 +28,16 @@ import kotlinx.coroutines.launch
  * Deliberate deviations from the original, since this targets a real terminal instead of a
  * Flash canvas:
  *  - `gdxt.php` server calls have no backend; they are no-ops. `uid` is synthesized locally.
- *  - Flash's `getURL()` navigation (LOGOUT / PLAY PORTAL) exits the program instead of opening
- *    a browser.
+ *  - Flash's `getURL()` navigation (LOGOUT / PLAY PORTAL) prints a message instead of opening a
+ *    browser. This class never terminates the process itself - that's a host/UI-layer decision,
+ *    not this engine's; [farewell] is otherwise a no-op once its message has been shown.
  *  - The cosmetic "glitching UID digits" and rare cake-image flicker are not reproduced.
  */
 class TerminalEngine {
-    var liveLine by mutableStateOf("")
-        private set
-    var isLocked by mutableStateOf(true)
-        private set
+    private val _liveLine = MutableStateFlow("")
+    val liveLine: StateFlow<String> = _liveLine.asStateFlow()
+
+    private var isLocked = true
 
     private lateinit var scope: CoroutineScope
 
@@ -63,12 +67,7 @@ class TerminalEngine {
         }
     }
 
-    fun onKeyEvent(key: String, ctrl: Boolean = false): Boolean {
-        // Always exit on Ctrl+C, regardless of lock state or mode - there must always be a way
-        // out, even from the cake/bosskey loop which has no in-story escape in the original.
-        if (ctrl && key == "c") {
-            exitProcess(0)
-        }
+    fun onKeyEvent(key: String): Boolean {
         if (isLocked) return true
 
         // In the cake/bosskey easter egg, ANY accepted key toggles between the two screens -
@@ -112,12 +111,12 @@ class TerminalEngine {
     private fun updateLiveLine() {
         val isPasswordPrompt = entryMode == MODE_LOGIN && (qon == 2 || qon == 3)
         val echoed = if (isPasswordPrompt) "*".repeat(input.length) else input.toString()
-        liveLine = pageContent + echoed
+        _liveLine.value = pageContent + echoed
     }
 
     private fun clearScreen() {
         pageContent = ""
-        liveLine = ""
+        _liveLine.value = ""
     }
 
     private fun handlePaging(delta: Int) {
@@ -230,7 +229,7 @@ class TerminalEngine {
         val text = rawText.trimStart()
         if (text.isEmpty()) {
             // The original returns immediately without even clearing the field.
-            liveLine = pageContent + input
+            _liveLine.value = pageContent + input
             isLocked = false
             return
         }
@@ -363,7 +362,7 @@ class TerminalEngine {
             showNextPage()
         } else {
             input.clear()
-            liveLine = pageContent
+            _liveLine.value = pageContent
             isLocked = false
         }
     }
@@ -432,8 +431,6 @@ class TerminalEngine {
     private suspend fun farewell(url: String) {
         clearScreen()
         reveal("\n[Connection closed. This would open $url in your browser.]\n", GLADOS_SPEED)
-        delay(400)
-        exitProcess(0)
     }
 
     /**
@@ -449,7 +446,8 @@ class TerminalEngine {
      * verbatim from [TerminalData] be passed straight through unmodified. Lines are also
      * word-wrapped to [WRAP_WIDTH]: the original auto-wrapped unbroken text past a pixel-width
      * threshold too, and without it a single long line soft-wraps in the real terminal while
-     * still animating, which desyncs Mosaic's redraw bookkeeping and leaves stray duplicate rows.
+     * still animating, which can desync a UI's redraw bookkeeping (observed with Mosaic) and
+     * leave stray duplicate rows behind.
      */
     private suspend fun reveal(text: String, delayMs: Int, unlockAfter: Boolean = true) {
         val logicalLines = text.replace("@", "[$uid]").replace("^", "\n").split("\n")
@@ -460,19 +458,19 @@ class TerminalEngine {
                 val sb = StringBuilder()
                 for (ch in line) {
                     sb.append(ch)
-                    liveLine = base + sb
+                    _liveLine.value = base + sb
                     delay(delayMs.toLong())
                 }
                 pageContent = base + sb
             } else {
                 pageContent = base + line
-                liveLine = pageContent
+                _liveLine.value = pageContent
             }
             if (index != lines.lastIndex) {
                 pageContent += "\n"
             }
         }
-        liveLine = pageContent
+        _liveLine.value = pageContent
         if (unlockAfter) {
             isLocked = false
         }

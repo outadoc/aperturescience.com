@@ -4,7 +4,7 @@ import json
 import sys
 
 SRC = "/var/home/outadoc/dev/projects/web/aperturescience.com/decompiled/terminal_data.json"
-DST = "/var/home/outadoc/dev/projects/web/aperturescience.com/cli/src/main/kotlin/com/aperturescience/terminal/data/TerminalData.kt"
+DST = "/var/home/outadoc/dev/projects/web/aperturescience.com/cli/logic/src/main/kotlin/com/aperturescience/terminal/data/TerminalData.kt"
 
 TYPE_MAP = {"T": "TEXT", "C": "CHECKBOX", "R": "RADIO"}
 
@@ -28,7 +28,7 @@ def main():
     lines.append("// GENERATED FILE — do not edit by hand.")
     lines.append("// Source data extracted verbatim from the decompiled ActionScript")
     lines.append("// (DoAction.as) of ApertureScience17 (2007-10-17).swf via")
-    lines.append("// ../scripts/gen_kotlin_data.py. Regenerate rather than hand-edit.")
+    lines.append("// scripts/gen_kotlin_data.py (from repo root). Regenerate rather than hand-edit.")
     lines.append("package com.aperturescience.terminal.data")
     lines.append("")
     lines.append("enum class QuestionType { TEXT, CHECKBOX, RADIO }")

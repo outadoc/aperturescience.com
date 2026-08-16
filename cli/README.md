@@ -10,6 +10,19 @@ including its quirks — in a real terminal, no Flash required.
 See [`../AGENTS.md`](../AGENTS.md) for how this was decompiled, extracted,
 and ported, and for the list of deliberate deviations from the original.
 
+## Project structure
+
+Two Gradle modules:
+
+- **`logic/`** — the whole state machine (`TerminalEngine`), with no
+  dependency on Mosaic, Compose, or any other UI framework. Exposes a plain
+  `StateFlow<String>` (the currently-displayed screen) and a
+  `fun onKeyEvent(key: String, ctrl: Boolean): Boolean`.
+- **`ui-terminal/`** — the Mosaic-based terminal UI (depends on `logic`).
+  Collects the engine's `StateFlow` into a Compose `Text()` and forwards key
+  events into it. This is the module with the `application`/shadow-jar setup
+  and the `main()` entry point.
+
 ## Requirements
 
 - JDK 21+
@@ -27,7 +40,7 @@ or build a standalone fat jar:
 
 ```sh
 ./gradlew shadowJar
-java -jar build/libs/aperturescience-terminal-0.1.0-all.jar
+java -jar ui-terminal/build/libs/aperturescience-terminal-0.1.0-all.jar
 ```
 
 The program takes over the whole terminal on launch, like `vim` or `htop`
