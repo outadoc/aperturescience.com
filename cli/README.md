@@ -43,6 +43,20 @@ or build a standalone fat jar:
 java -jar ui-terminal/build/libs/aperturescience-terminal-0.1.0-all.jar
 ```
 
+## Testing
+
+`logic` has an automated unit test suite covering the whole state machine:
+
+```sh
+./gradlew :logic:test
+```
+
+No real TTY needed — it runs in well under a second using
+`kotlinx-coroutines-test`'s virtual time, so even the 2313-choice question's
+pagination and a full 50-question run-through execute instantly. `ui-terminal`
+has no automated tests (Mosaic needs a real terminal); verify UI changes
+manually as described above.
+
 The program takes over the whole terminal on launch, like `vim` or `htop`
 (using the terminal's alternate-screen buffer) — whatever was on screen
 before is hidden while it runs and comes back exactly as it was when it

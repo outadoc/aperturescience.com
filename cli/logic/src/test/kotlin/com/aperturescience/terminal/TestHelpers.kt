@@ -1,0 +1,57 @@
+package com.aperturescience.terminal
+
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
+
+/**
+ * Test-only driver helpers for [TerminalEngine]. All of these advance virtual time to
+ * completion after every simulated keystroke, so callers never need real-time waits for the
+ * engine's typewriter animations (`reveal()`'s `delay()` calls) - see [TestScope]/`runTest`.
+ */
+
+/** Sends a single raw key (as [TerminalEngine.onKeyEvent] expects it) and settles. */
+fun TestScope.pressKey(engine: TerminalEngine, key: String) {
+    engine.onKeyEvent(key)
+    advanceUntilIdle()
+}
+
+/**
+ * Types [text] one character at a time (matching how a real keyboard feeds
+ * [TerminalEngine.onKeyEvent]), then presses Enter, then settles.
+ */
+fun TestScope.submit(engine: TerminalEngine, text: String) {
+    for (c in text) {
+        engine.onKeyEvent(c.toString())
+    }
+    engine.onKeyEvent("Enter")
+    advanceUntilIdle()
+}
+
+/** Boots [engine] and settles once the initial `"> "` prompt has fully revealed. */
+fun TestScope.bootAndSettle(engine: TerminalEngine): TerminalEngine {
+    engine.boot(this)
+    advanceUntilIdle()
+    return engine
+}
+
+/** Boots and logs in as a regular (non-admin) user, ending at the `B:\>` shell prompt. */
+fun TestScope.loginToShell(
+    engine: TerminalEngine = TerminalEngine(),
+    username: String = "TESTER",
+    password: String = "PORTAL",
+): TerminalEngine {
+    bootAndSettle(engine)
+    submit(engine, "LOGON")
+    submit(engine, username)
+    submit(engine, password)
+    return engine
+}
+
+/** Boots and logs in as the `CJOHNSON` admin user, ending at the `ADMIN>` shell prompt. */
+fun TestScope.loginAsAdmin(engine: TerminalEngine = TerminalEngine()): TerminalEngine {
+    bootAndSettle(engine)
+    submit(engine, "LOGON")
+    submit(engine, "CJOHNSON")
+    submit(engine, "TIER3")
+    return engine
+}

@@ -223,6 +223,22 @@ things worth knowing:
   navigating a browser; the cake video is a text placeholder
   (`security02.flv` isn't reproduced); cosmetic-only effects (glitching UID
   digits, random cake-image flicker) are skipped.
-- Not yet done: no automated test suite (all verification so far is manual/
-  interactive via `tmux`). See `cli/README.md` for build/run instructions
-  and the full command/state tree.
+- `cli/logic` has an automated unit test suite (`kotlin.test` +
+  `kotlinx-coroutines-test`, `./gradlew :logic:test`): 76 tests across
+  `LoginFlowTest`, `ShellCommandsTest`, `ApplicationWizardTest`,
+  `NotesExeTest`, `CakeBosskeyTest`, `InputHandlingTest`. Drives
+  `TerminalEngine` through `TestScope`/`runTest`'s virtual time, so the
+  whole suite runs in well under a second despite exercising every typewriter
+  animation (including the 2313-choice Q21 pagination and the full 50-question
+  form) - see `TestHelpers.kt`. `ui-terminal` still has none (harder to unit
+  test - Mosaic needs a real TTY); UI-level behavior is still verified
+  manually via `tmux` as described above.
+  - Two quirks the test suite caught/confirmed: `qar[8]`'s crisis message
+    word-wraps "Crisis Response" and "Team" onto separate lines at
+    `WRAP_WIDTH`, so tests assert on `"mobilized"` instead of the
+    straddling phrase. More interestingly, `APPLY.EXE`/`NOTES.EXE` (both
+    referenced in shell code as valid command aliases) are **unreachable
+    in practice**: `.` isn't in the accepted-character set, faithfully
+    matching the original's keyCode allowlist which also has no period key
+    - so typing either one actually submits `APPLYEXE`/`NOTESEXE`, which
+    don't match anything and fall through to the unknown-command error.
