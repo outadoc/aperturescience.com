@@ -1,3 +1,3 @@
 rootProject.name = "aperturescience-terminal"
 
-include(":logic", ":ui-terminal")
+include(":logic", ":ui-terminal", ":ui-web")

@@ -54,20 +54,26 @@ screen. All logic and text lives in a single ~4300-line AS2 script
   from that JSON (verbatim string literals, escaped for Kotlin). This file
   is committed as a generated artifact — do not hand-edit it, rerun the
   script instead.
-- `cli/` — the Kotlin reimplementation (Gradle, Kotlin Multiplatform: `jvm()`
-  + `linuxX64()` targets, version catalog at `cli/gradle/libs.versions.toml`).
-  Two modules: `cli/logic/` (the whole state machine, `TerminalEngine.kt` +
-  `data/TerminalData.kt` in `src/commonMain/` — plain Kotlin/coroutines, zero
-  dependency on Mosaic/Compose or any other UI framework; tests in
-  `src/commonTest/` run on both targets) and `cli/ui-terminal/` (the
+- `cli/` — the Kotlin reimplementation (Gradle, Kotlin Multiplatform: `jvm()`,
+  `linuxX64()`, and `wasmJs()` targets, version catalog at
+  `cli/gradle/libs.versions.toml`). Three modules: `cli/logic/` (the whole
+  state machine, `TerminalEngine.kt` + `data/TerminalData.kt` in
+  `src/commonMain/` — plain Kotlin/coroutines, zero dependency on
+  Mosaic/Compose, kotlinx-browser, or any other UI framework; tests in
+  `src/commonTest/` run on all three targets); `cli/ui-terminal/` (the
   Mosaic-based UI, depends on `:logic`; `App.kt`/`AppRunner.kt`/`Platform.kt`
   live in `src/commonMain/`, with a tiny per-target `Main.kt` +
   `Platform.kt` actual in `src/jvmMain/` and `src/nativeMain/` — see "UI
-  toolkit: Mosaic" below for why the platform split exists at all). Builds
-  and runs on the host directly (Gradle 9.7 / JDK — no distrobox needed for
-  this half of the project, only for decompilation). `:ui-terminal:shadowJar`
-  produces the JVM fat jar; `:ui-terminal:linkReleaseExecutableLinuxX64`
-  produces a standalone native Linux binary that needs no JVM at all.
+  toolkit: Mosaic" below for why the platform split exists at all); and
+  `cli/ui-web/` (the browser UI, `wasmJs()`-only, depends on `:logic`,
+  drives the DOM directly with `kotlinx-browser` instead of Mosaic — see
+  "Web frontend: ui-web" below). Builds and runs on the host directly
+  (Gradle 9.7 / JDK — no distrobox needed for this half of the project, only
+  for decompilation). `:ui-terminal:shadowJar` produces the JVM fat jar;
+  `:ui-terminal:linkReleaseExecutableLinuxX64` produces a standalone native
+  Linux binary that needs no JVM at all; `:ui-web:wasmJsBrowserDistribution`
+  produces the static site (`.wasm` + `.js` + `index.html`/`styles.css`) in
+  `cli/ui-web/build/dist/wasmJs/productionExecutable/`.
 
 ## Reimplementation plan (Kotlin CLI, `cli/`)
 
@@ -205,7 +211,82 @@ things worth knowing:
   the `signal()` path) an external `kill -TERM`, with the terminal left in a
   normal, working state afterward.
 
-## Status (2026-08-16)
+## Web frontend: ui-web
+
+`cli/ui-web/` is a `wasmJs()`-only Kotlin Multiplatform module (Kotlin/Wasm,
+browser target) that depends on `:logic` and drives the DOM directly with
+[`kotlinx-browser`](https://github.com/Kotlin/kotlinx-browser) - there's no
+shared UI layer with `ui-terminal` because Mosaic has no Wasm target at all
+(confirmed: its published Gradle module metadata only advertises `jvm` and a
+handful of Kotlin/Native targets, no `wasmJs`). `TerminalEngine` itself
+needed **zero** changes to support this: it was already UI-agnostic
+(`liveLine`/`exitRequested` are plain `StateFlow`s, `onKeyEvent` takes a
+plain key name), the exact contract `Main.kt` here binds to the DOM with
+instead of Mosaic's `Text()`/`onKeyEvent`.
+
+- `src/wasmJsMain/kotlin/.../Main.kt`: `main()` grabs `<pre id="terminal">`
+  by id, launches a coroutine collecting `engine.liveLine` into its
+  `textContent` (a full-string replacement each emission - simpler than
+  Mosaic's diffing approach and correct here because the browser's own text
+  layout does real soft-wrapping, so there's no analog of the
+  Mosaic-desync-on-narrow-terminal bug `wrapWidth`/`setViewportWidth` exists
+  to avoid on the CLI side), and forwards `keydown` events to
+  `engine.onKeyEvent`. Ctrl/Cmd/Alt combos are deliberately *not* forwarded
+  (and not `preventDefault()`-ed) so browser/OS shortcuts keep working -
+  this frontend's equivalent of `App.kt` returning `false` for Ctrl+C.
+- `src/wasmJsMain/resources/index.html` + `styles.css`: hand-written, not
+  Kotlin-generated - a green-phosphor-on-black CRT-styled page with a
+  blinking block-cursor `::after` on the terminal element (there's no
+  movable cursor to track - `TerminalEngine.reveal()`/Backspace always
+  read/write the *end* of `pageContent`, so a permanent end-of-text cursor
+  is faithful, not a simplification).
+- `:logic`'s `wasmJs()` target needs **both** `d8()` (V8's standalone CLI
+  shell - what actually runs `wasmJsD8Test`, headlessly, no browser needed)
+  *and* `browser()` (with its own test task disabled -
+  `browser { testTask { enabled = false } }` - since it'd need a headless
+  Chrome that isn't installed, and `d8()` already covers this DOM-free
+  module's whole suite). `browser()` alone looks redundant, but without it
+  `ui-web`'s `wasmJsBrowserDistribution` fails to configure at all:
+  `":logic is not configured for JS usage"` - the webpack/npm tooling that
+  bundles `ui-web` needs every wasmJs project it depends on, including a
+  pure-logic library with no DOM code, to have *some* JS/Wasm sub-target
+  registered, not just a Kotlin/Native-style `d8()` runner.
+- `:logic`'s `kotlinx-coroutines-core` dependency had to become `api(...)`,
+  not `implementation(...)`: `TerminalEngine`'s public surface
+  (`StateFlow<T>`, `boot(CoroutineScope)`) exposes coroutines types
+  directly, and `implementation` doesn't leak those onto a *separate Gradle
+  module's* compile classpath even though `ui-terminal` never needed this
+  fix itself (Mosaic's own `api`-scoped coroutines dependency was already
+  covering it transitively there).
+- No headless browser is available in this dev environment (no Chrome,
+  Playwright, etc.), so full in-browser interactive testing hasn't been
+  done here - only code review plus the verification below. If testing this
+  UI further, prefer an actual browser (`:ui-web:wasmJsBrowserDevelopmentRun`
+  for a live-reloading dev server) over trying to shim one.
+- What *has* been verified: `:logic:wasmJsD8Test` runs the full 76-test
+  suite against the actual compiled Wasm binary via V8 (not a mock/stub of
+  any kind) - strong evidence `:logic` behaves identically compiled to Wasm
+  as it does on JVM/`linuxX64`. Separately, `:ui-web`'s own production
+  Wasm+JS output was smoke-tested end-to-end outside a real browser, by
+  importing the raw (non-webpack-bundled) `ui-web.mjs` under Node with a
+  hand-rolled DOM stub (`window`/`document`/`HTMLPreElement`/`KeyboardEvent`
+  stand-ins) - simulated keystrokes drove a real login through to the
+  `B:\>` shell prompt, and a Ctrl-modified keystroke was confirmed *not* to
+  reach the engine. Two non-obvious things surfaced doing this, worth
+  knowing if repeating it: Kotlin/Wasm's `as SomeExternalType` casts (and
+  the JS-interop adapters wrapping callback parameters like `(Event) ->
+  Unit`) do a real `instanceof` check against the browser's global
+  constructor for that type at runtime - a duck-typed stub object isn't
+  enough, `globalThis.HTMLPreElement`/`Event`/`KeyboardEvent` all had to be
+  defined as actual stub classes and instantiated with `new`; and the
+  *webpack-bundled* `ui-web.js` (as opposed to the raw compiler-output
+  `.mjs`) additionally runs webpack's own Node/browser/Deno/d8
+  environment-autodetection bootstrap first, which itself calls
+  `document.getElementsByTagName`/`currentScript` before any application
+  code runs at all - importing the raw `.mjs` sidesteps that entirely and
+  is the easier thing to stub against.
+
+## Status (2026-08-17)
 
 - Decompilation, data extraction, and Kotlin scaffold: done (see above).
 - State machine (`cli/logic/.../TerminalEngine.kt`): **implemented** —
