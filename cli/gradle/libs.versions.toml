@@ -5,6 +5,13 @@ mosaic = "0.18.0"
 shadow = "9.6.1"
 ktlint = "14.2.0"
 kotlinx-browser = "0.5.0"
+# Pinned to the same Ktor version outadoc/minipavi-kotlin's `core` module is itself compiled
+# against, rather than the latest 3.x, to avoid mixing minor versions against its compiled API.
+ktor = "3.0.2"
+kotlinx-serialization = "1.11.0"
+# outadoc/minipavi-kotlin, published via JitPack (no Maven Central releases) - see
+# https://github.com/outadoc/minipavi-kotlin/releases for newer tags.
+minipavi = "0.0.9"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -12,9 +19,15 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 mosaic-runtime = { module = "com.jakewharton.mosaic:mosaic-runtime", version.ref = "mosaic" }
 kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinx-browser" }
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
+minipavi-core = { module = "com.github.outadoc.minipavi-kotlin:core", version.ref = "minipavi" }
+minipavi-videotex = { module = "com.github.outadoc.minipavi-kotlin:videotex", version.ref = "minipavi" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlin-plugin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-plugin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }

@@ -56,24 +56,29 @@ screen. All logic and text lives in a single ~4300-line AS2 script
   script instead.
 - `cli/` — the Kotlin reimplementation (Gradle, Kotlin Multiplatform: `jvm()`,
   `linuxX64()`, and `wasmJs()` targets, version catalog at
-  `cli/gradle/libs.versions.toml`). Three modules: `cli/logic/` (the whole
+  `cli/gradle/libs.versions.toml`). Four modules: `cli/logic/` (the whole
   state machine, `TerminalEngine.kt` + `data/TerminalData.kt` in
   `src/commonMain/` — plain Kotlin/coroutines, zero dependency on
-  Mosaic/Compose, kotlinx-browser, or any other UI framework; tests in
-  `src/commonTest/` run on all three targets); `cli/ui-terminal/` (the
-  Mosaic-based UI, depends on `:logic`; `App.kt`/`AppRunner.kt`/`Platform.kt`
-  live in `src/commonMain/`, with a tiny per-target `Main.kt` +
-  `Platform.kt` actual in `src/jvmMain/` and `src/nativeMain/` — see "UI
-  toolkit: Mosaic" below for why the platform split exists at all); and
-  `cli/ui-web/` (the browser UI, `wasmJs()`-only, depends on `:logic`,
-  drives the DOM directly with `kotlinx-browser` instead of Mosaic — see
-  "Web frontend: ui-web" below). Builds and runs on the host directly
-  (Gradle 9.7 / JDK — no distrobox needed for this half of the project, only
-  for decompilation). `:ui-terminal:shadowJar` produces the JVM fat jar;
+  Mosaic/Compose, kotlinx-browser, kotlinx-serialization, or any other UI/
+  serialization framework; tests in `src/commonTest/` run on all three
+  targets); `cli/ui-terminal/` (the Mosaic-based UI, depends on `:logic`;
+  `App.kt`/`AppRunner.kt`/`Platform.kt` live in `src/commonMain/`, with a
+  tiny per-target `Main.kt` + `Platform.kt` actual in `src/jvmMain/` and
+  `src/nativeMain/` — see "UI toolkit: Mosaic" below for why the platform
+  split exists at all); `cli/ui-web/` (the browser UI, `wasmJs()`-only,
+  depends on `:logic`, drives the DOM directly with `kotlinx-browser`
+  instead of Mosaic — see "Web frontend: ui-web" below); and
+  `cli/ui-minitel/` (the Minitel/Vidéotex service, `jvm()`-only, depends on
+  `:logic` and `outadoc/minipavi-kotlin` — see "Minitel frontend:
+  ui-minitel" below). Builds and runs on the host directly (Gradle 9.7 / JDK
+  — no distrobox needed for this half of the project, only for
+  decompilation). `:ui-terminal:shadowJar` produces the JVM fat jar;
   `:ui-terminal:linkReleaseExecutableLinuxX64` produces a standalone native
   Linux binary that needs no JVM at all; `:ui-web:wasmJsBrowserDistribution`
   produces the static site (`.wasm` + `.js` + `index.html`/`styles.css`) in
-  `cli/ui-web/build/dist/wasmJs/productionExecutable/`.
+  `cli/ui-web/build/dist/wasmJs/productionExecutable/`; `cli/ui-minitel`'s
+  `main()` starts an embedded Ktor/Netty server on port 8080 for the
+  MiniPavi gateway to call.
 
 ## Reimplementation plan (Kotlin CLI, `cli/`)
 
@@ -304,6 +309,106 @@ instead of Mosaic's `Text()`/`onKeyEvent`.
   code runs at all - importing the raw `.mjs` sidesteps that entirely and
   is the easier thing to stub against.
 
+## Minitel frontend: ui-minitel
+
+`cli/ui-minitel/` serves the same terminal over a real Minitel via
+[`outadoc/minipavi-kotlin`](https://github.com/outadoc/minipavi-kotlin), a
+Ktor SDK for the "MiniPavi" Minitel/Vidéotex gateway platform, published only
+via JitPack (`https://jitpack.io`, added to the root `build.gradle.kts`'s
+`allprojects { repositories {} }` block; `jvm()`-only, since minipavi-kotlin's
+`minitelService`/Ktor routing lives only in its `core` module's `jvmMain`).
+Unlike `ui-terminal`/`ui-web`, this isn't a long-lived session pushing
+`liveLine` updates to a persistent surface: MiniPavi calls this service's
+embedded Ktor/Netty server (port 8080) exactly once per completed user
+action — a full already-validated line of input, or a bare function-key
+press, never individual keystrokes — and expects exactly one Vidéotex frame
+back, synchronously, with nothing persisted in this process between calls.
+Session continuity is carried entirely through a `@Serializable`
+`MinitelSessionState` (this module's own DTO) round-tripped by the gateway.
+
+- **`TerminalEngine` additions** (`cli/logic/.../TerminalEngine.kt`), all
+  strictly additive — `liveLine`/`exitRequested`/`boot(scope)`/
+  `onKeyEvent(key)`/`setViewportWidth(columns)`/the no-arg constructor are
+  untouched, and every real `delay()` call (the `reveal()` typewriter effect,
+  `farewell()`'s pause, the cake-monologue pause) now goes through a single
+  `maybeDelay()` helper that's a no-op when `instantReveal = true`:
+  - `TerminalEngine(instantReveal: Boolean = false, initialState: EngineState? = null)` —
+    `instantReveal = true` collapses a whole turn's `delay()` calls to zero
+    wall-clock time (byte-identical *content* to the animated path, just
+    instant); `initialState` seeds every mutable field from a captured
+    [`EngineState`], instead of `TerminalEngine()`'s hardcoded defaults.
+  - `EngineState` (new file, `EngineState.kt`) — a plain (non-`@Serializable`)
+    snapshot of every field that varies turn-to-turn. `:logic` never depends
+    on `kotlinx.serialization` itself; `ui-minitel`'s `MinitelSessionState`
+    is its own `@Serializable` mirror, converted at the module boundary.
+  - `captureState(): EngineState` — the counterpart to `initialState`, for a
+    host that can't keep a `TerminalEngine` instance alive in memory between
+    turns (a stateless request/response session, unlike `ui-terminal`/
+    `ui-web`'s long-lived in-process sessions).
+  - A new synchronous "batch" API — `bootTurn()`/`submitLine(line)`/
+    `advance()`/`page(delta)` — only meaningful with `instantReveal = true`:
+    each runs an entire turn to completion and returns the resulting
+    `liveLine` snapshot directly, without ever touching `scope` (unlike
+    `boot()`/`onKeyEvent()`, which fire-and-forget via `scope.launch`). These
+    reuse the exact same private dispatch functions (`handleEnter`,
+    `dispatchLogin/Shell/Application/Notes`, `toggleCakeBosskey`,
+    `handlePagingBody`) the streaming API already calls — no state machine
+    logic is duplicated.
+  - `MODE_LOGIN`/`MODE_SHELL`/`MODE_APPLICATION`/`MODE_BOSSKEY`/`MODE_CAKE`/
+    `MODE_NOTES`/`PAGE_SIZE` went from `private` to public `const val`s (a
+    plain visibility widening, same values) so a stateless host can classify
+    a restored `EngineState.entryMode` without duplicating magic numbers.
+- **Two pagination layers, kept separate.** `TerminalEngine`'s own Q21
+  >104-choice pagination (`page(delta)`/`handlePagingBody`, unchanged) is
+  Layer A. Minitel's screen is a fixed 40×24 grid with no native scrolling,
+  and minipavi-kotlin gives exactly one frame per call — so `ui-minitel`'s
+  own `ScreenChunker` (Layer B) slices *any* turn's output (login banners,
+  shell errors, NOTES.EXE pages, and even one 104-line Q21 choice page from
+  Layer A) into ≤24-line chunks, advancing on the next user action before
+  ever calling back into the engine. `TurnHandler.handleTurn` owns the
+  per-call classification: still-more-chunks-to-show scrolls (no engine
+  call); only once the last chunk of the current engine-level page is
+  reached does a `FunctionKey.Envoi`/`Suite`/`Retour` press actually reach
+  `submitLine`/`advance`/`page`.
+- **Farewell → disconnect, in two steps.** Exactly one frame per call means
+  the farewell message (`LOGOUT`/`PLAY PORTAL`/the UIN(+L) trap into
+  `THECAKEISALIE`) and the actual disconnect can't happen in the same
+  response. The turn where `TerminalEngine.exitRequested` flips true renders
+  the farewell text as a normal page and persists `pendingDisconnect = true`
+  in `MinitelSessionState`; the user's *next* keypress, whatever it is, hits
+  `TurnHandler`'s first check and returns `ServiceResponse.Command.Disconnect`
+  immediately, with no `TerminalEngine` involved at all — matching how
+  `ui-terminal`/`ui-web` show a final message before ending rather than
+  cutting the session off mid-sentence.
+- **A brand-new session gets a genuinely fresh engine.** `GatewayRequest.Event.Connection`
+  is special-cased to construct `TerminalEngine(instantReveal = true)` with
+  *no* `initialState` — not restored from `MinitelSessionState.initial()`'s
+  placeholder — so `uid` is randomly synthesized exactly like a fresh
+  `TerminalEngine()` on the other two frontends, instead of picking up the
+  placeholder's empty one.
+- **Not verified against a live MiniPavi gateway or even compiled against
+  the real `minipavi-kotlin` artifact** — this sandbox's egress policy
+  blocks JitPack (`jitpack.io`) and its Google Maven mirror entirely (403 on
+  every artifact request, confirmed both via `curl` and Gradle dependency
+  resolution), so `:ui-minitel` could not be build-verified here. It was
+  written against a source-level reading of `outadoc/minipavi-kotlin`
+  (`GatewayRequest`/`FunctionKey`/`ServiceResponse`/`VideotexBuilder`)
+  rather than the compiled API, and the `submitWith`/function-key wiring in
+  `TurnHandler` in particular is a best-effort reading worth validating for
+  real before relying on it. What *was* verified in this environment:
+  `:logic:jvmTest` (87 tests, the pre-existing 76 plus new coverage for the
+  batch API and `captureState()`/`initialState` round-tripping — all pass,
+  confirming `instantReveal = false` stays byte-identical to before this
+  change) and `:logic`/`:ui-web` compiling cleanly for the `wasmJs` target;
+  `:ui-terminal` could not be build-verified either, for an unrelated
+  pre-existing reason (Mosaic's transitive `androidx.lifecycle`/
+  `androidx.annotation` dependencies, via `google()`, are equally blocked
+  here) — its source is untouched by this change. `:ui-minitel`'s own
+  `ScreenChunker`/`MinitelSessionState` unit tests (`ScreenChunkerTest.kt`,
+  `MinitelSessionStateTest.kt`) are written but likewise unrun here, since
+  compiling `:ui-minitel`'s main sources (a prerequisite for its test
+  sources) needs the same blocked dependency.
+
 ## Status (2026-08-17)
 
 - Decompilation, data extraction, and Kotlin scaffold: done (see above).
@@ -353,8 +458,10 @@ instead of Mosaic's `Text()`/`onKeyEvent`.
 - `cli/logic` has an automated unit test suite (`kotlin.test` +
   `kotlinx-coroutines-test`, `./gradlew :logic:allTests` - runs on both the
   `jvm` and `linuxX64` targets since the tests live in `src/commonTest/`):
-  76 tests across `LoginFlowTest`, `ShellCommandsTest`, `ApplicationWizardTest`,
-  `NotesExeTest`, `CakeBosskeyTest`, `InputHandlingTest`. Drives
+  87 tests across `LoginFlowTest`, `ShellCommandsTest`, `ApplicationWizardTest`,
+  `NotesExeTest`, `CakeBosskeyTest`, `InputHandlingTest`, and `BatchApiTest`
+  (the `instantReveal`/`captureState` synchronous API added for `ui-minitel`,
+  see "Minitel frontend: ui-minitel" above). Drives
   `TerminalEngine` through `TestScope`/`runTest`'s virtual time, so the
   whole suite runs in well under a second despite exercising every typewriter
   animation (including the 2313-choice Q21 pagination and the full 50-question
