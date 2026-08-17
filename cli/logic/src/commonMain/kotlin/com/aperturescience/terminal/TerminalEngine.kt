@@ -1,5 +1,7 @@
 package com.aperturescience.terminal
 
+import com.aperturescience.terminal.TerminalEngine.Companion.PAGE_SIZE
+import com.aperturescience.terminal.TerminalEngine.Companion.WRAP_WIDTH
 import com.aperturescience.terminal.data.QuestionType
 import com.aperturescience.terminal.data.TerminalData
 import kotlinx.coroutines.CoroutineScope
@@ -9,12 +11,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Faithful port of the state machine in the decompiled `DoAction.as` (AS2) script that drives
- * ApertureScience17 (2007-10-17).swf. Mirrors that script's `entryMode`/`qon` state pair and its
- * `processInput0/1/2/5`, `switchPage`, `formatQuestion`, `thecakeisalie`, `bosskey`, and
- * `notesdisplay` functions closely enough that behavior (including its quirks) should match.
+ * ApertureScience17 (2007-10-17).swf. Mirrors that script's `processInput0/1/2/5`, `switchPage`,
+ * `formatQuestion`, `thecakeisalie`, `bosskey`, and `notesdisplay` functions closely enough that
+ * behavior (including its quirks) should match - see [Mode] for how "where the user currently is"
+ * is represented (a sealed hierarchy, not the original's raw `entryMode`/`qon` int pair).
  *
  * This class has no UI dependency of any kind, and never terminates the process itself (no
  * `exitProcess`/`System.exit()` anywhere here - that would be fatal to embed in a test suite or a
@@ -25,9 +29,9 @@ import kotlin.random.Random
  * original terminal's modeled behavior.
  *
  * Rendering matches the original's `clearScreen()`-then-redraw model: every new page wipes
- * [pageContent] and rebuilds it from scratch, exactly like the original wiped its Flash canvas
- * before drawing the next banner - including that whatever you just typed disappears along with
- * everything else. It is not echoed anywhere once submitted, matching the original.
+ * [EngineState.pageContent] and rebuilds it from scratch, exactly like the original wiped its
+ * Flash canvas before drawing the next banner - including that whatever you just typed disappears
+ * along with everything else. It is not echoed anywhere once submitted, matching the original.
  *
  * Deliberate deviations from the original, since this targets a real terminal instead of a
  * Flash canvas:
@@ -48,31 +52,35 @@ class TerminalEngine(
     /** True once the session should end (LOGOUT/PLAY PORTAL) - see the class doc. */
     val exitRequested: StateFlow<Boolean> = _exitRequested.asStateFlow()
 
-    private var isLocked = initialState?.isLocked ?: true
-
     private lateinit var scope: CoroutineScope
 
-    private val input = StringBuilder(initialState?.input ?: "")
+    /** Every mutable field this engine carries between turns, held as one value instead of
+     * scattered across separate properties - every transition reassigns this via `.copy(...)`.
+     * See [EngineState] and [captureState]/[initialState] for how a host resumes a session from
+     * one of these without keeping a live [TerminalEngine] around. */
+    private var state: EngineState =
+        initialState ?: EngineState(
+            mode = Mode.Login.Initial,
+            isAdmin = false,
+            uid = synthesizeUid(),
+            pageContent = "",
+            input = "",
+            wrapWidth = WRAP_WIDTH,
+            isLocked = true,
+        )
 
-    /** Everything drawn on the current page so far, up to (not including) the live input. */
-    private var pageContent = initialState?.pageContent ?: ""
-
-    // --- state mirroring DoAction.as globals ---
-    private var entryMode = initialState?.entryMode ?: MODE_LOGIN
-    private var qon = initialState?.qon ?: 0
-    private var isCj = initialState?.isCj ?: false
-    private var notesPage = initialState?.notesPage ?: 0
-    private var pageOffset = initialState?.pageOffset ?: 0
-    private var gladosHeader = initialState?.gladosHeader ?: "GLaDOS v1.07 (c) 1982 Aperture Science, Inc."
-    private var gladosPrompt = initialState?.gladosPrompt ?: " ^^B:\\> "
-    private var gladosMessage = initialState?.gladosMessage ?: ""
-    private val uid = initialState?.uid ?: synthesizeUid()
-
-    // Defaults to WRAP_WIDTH so existing behavior (and tests/hosts that never call
-    // setViewportWidth) is unchanged; a host UI narrower than that must call
-    // setViewportWidth before/while booting to avoid the redraw-desync bug described on
-    // [reveal].
-    private var wrapWidth = initialState?.wrapWidth ?: WRAP_WIDTH
+    // Fully determined by isAdmin - not stored, so there's no way for these to go stale relative to
+    // it (a regular login never reassigns them; the original AS2 port did, redundantly, since it
+    // had no equivalent of a computed property).
+    private val gladosHeader: String
+        get() =
+            if (state.isAdmin) {
+                "GLaDOS v1.07a (c) 1982 Aperture Science, Inc."
+            } else {
+                "GLaDOS v1.07 (c) 1982 Aperture Science, Inc."
+            }
+    private val gladosPrompt: String
+        get() = if (state.isAdmin) "^^ADMIN> " else " ^^B:\\> "
 
     init {
         // _liveLine defaults to "" to match today's behavior (nothing is shown before boot()),
@@ -95,7 +103,7 @@ class TerminalEngine(
      * "100", still produced visibly mismatched wraps in practice.
      */
     fun setViewportWidth(columns: Int) {
-        if (columns > 0) wrapWidth = columns
+        if (columns > 0) state = state.copy(wrapWidth = columns)
     }
 
     /**
@@ -105,22 +113,7 @@ class TerminalEngine(
      * this one left off. See [EngineState] and the "batch API" section below for the intended
      * pairing (`instantReveal = true` + [bootTurn]/[submitLine]/[advance]/[page]).
      */
-    fun captureState(): EngineState =
-        EngineState(
-            entryMode = entryMode,
-            qon = qon,
-            isCj = isCj,
-            notesPage = notesPage,
-            pageOffset = pageOffset,
-            gladosHeader = gladosHeader,
-            gladosPrompt = gladosPrompt,
-            gladosMessage = gladosMessage,
-            uid = uid,
-            pageContent = pageContent,
-            input = input.toString(),
-            wrapWidth = wrapWidth,
-            isLocked = isLocked,
-        )
+    fun captureState(): EngineState = state
 
     fun boot(coroutineScope: CoroutineScope) {
         scope = coroutineScope
@@ -160,8 +153,8 @@ class TerminalEngine(
     /** The "any accepted key" equivalent [onKeyEvent] uses for MODE_NOTES/MODE_CAKE/MODE_BOSSKEY,
      * where there is no line-based input at all - just some input event advancing the page. */
     suspend fun advance(): String {
-        when (entryMode) {
-            MODE_CAKE, MODE_BOSSKEY -> toggleCakeBosskey()
+        when (state.mode) {
+            Mode.Cake, Mode.BossKey -> toggleCakeBosskey()
             else -> handleEnter()
         }
         return liveLine.value
@@ -174,11 +167,11 @@ class TerminalEngine(
     }
 
     fun onKeyEvent(key: String): Boolean {
-        if (isLocked) return true
+        if (state.isLocked) return true
 
         // In the cake/bosskey easter egg, ANY accepted key toggles between the two screens -
         // there is no line-based input at all here (matches the original's onKeyDown handler).
-        if (entryMode == MODE_CAKE || entryMode == MODE_BOSSKEY) {
+        if (state.mode == Mode.Cake || state.mode == Mode.BossKey) {
             if (isAcceptedRawKey(key)) {
                 scope.launch { toggleCakeBosskey() }
             }
@@ -186,7 +179,7 @@ class TerminalEngine(
         }
 
         // NOTES.EXE forces every keystroke to behave like Enter (notesCursor in the original).
-        if (entryMode == MODE_NOTES) {
+        if (state.mode is Mode.Notes) {
             if (isAcceptedRawKey(key)) {
                 scope.launch { handleEnter() }
             }
@@ -196,17 +189,18 @@ class TerminalEngine(
         when {
             key == "Enter" -> scope.launch { handleEnter() }
             key == "Backspace" -> {
-                if (input.isNotEmpty()) {
-                    input.deleteAt(input.length - 1)
+                if (state.input.isNotEmpty()) {
+                    state = state.copy(input = state.input.dropLast(1))
                     updateLiveLine()
                 }
             }
-            key == "PageUp" && entryMode == MODE_APPLICATION -> handlePaging(-PAGE_SIZE)
-            key == "PageDown" && entryMode == MODE_APPLICATION -> handlePaging(PAGE_SIZE)
+
+            key == "PageUp" && state.mode is Mode.Application -> handlePaging(-PAGE_SIZE)
+            key == "PageDown" && state.mode is Mode.Application -> handlePaging(PAGE_SIZE)
             key.length == 1 -> {
                 val c = key[0]
-                if (isAcceptedChar(c) && input.length < MAX_INPUT_LENGTH) {
-                    input.append(c.uppercaseChar())
+                if (isAcceptedChar(c) && state.input.length < MAX_INPUT_LENGTH) {
+                    state = state.copy(input = state.input + c.uppercaseChar())
                     updateLiveLine()
                 }
             }
@@ -215,23 +209,26 @@ class TerminalEngine(
     }
 
     private fun updateLiveLine() {
-        val isPasswordPrompt = entryMode == MODE_LOGIN && (qon == 2 || qon == 3)
-        val echoed = if (isPasswordPrompt) "*".repeat(input.length) else input.toString()
-        _liveLine.value = pageContent + echoed
+        val echoed = if (state.mode is Mode.Login.Password) "*".repeat(state.input.length) else state.input
+        _liveLine.value = state.pageContent + echoed
     }
 
     private fun clearScreen() {
-        pageContent = ""
+        state = state.copy(pageContent = "")
         _liveLine.value = ""
     }
 
     private suspend fun handlePagingBody(delta: Int) {
-        val choices = TerminalData.questions[qon - 1].choices
+        // No guard needed against a non-Application mode the way the original's equivalent
+        // (indexing TerminalData.questions[qon - 1] using whatever qon happened to hold) would
+        // have needed one - the sealed Mode makes "paginate while there's no question on screen"
+        // a type-level impossibility to handle here rather than a silent misbehavior.
+        val current = state.mode as? Mode.Application ?: return
+        val choices = TerminalData.questions[current.questionNumber - 1].choices
         if (choices.size <= PAGE_SIZE) return
-        val next = (pageOffset + delta).coerceIn(0, choices.size - 1)
-        if (next != pageOffset) {
-            pageOffset = next
-            isLocked = true
+        val next = (current.pageOffset + delta).coerceIn(0, choices.size - 1)
+        if (next != current.pageOffset) {
+            state = state.copy(mode = current.copy(pageOffset = next), isLocked = true)
             clearScreen()
             showQuestion()
         }
@@ -244,121 +241,141 @@ class TerminalEngine(
     /** Whole-line equivalent of the per-character filtering [onKeyEvent] applies as the user
      * types - shared so [submitLine] accepts exactly the same characters as typing would. */
     private fun setInputLine(line: String) {
-        input.clear()
-        for (c in line) {
-            if (isAcceptedChar(c) && input.length < MAX_INPUT_LENGTH) {
-                input.append(c.uppercaseChar())
+        val filtered =
+            buildString {
+                for (c in line) {
+                    if (isAcceptedChar(c) && length < MAX_INPUT_LENGTH) {
+                        append(c.uppercaseChar())
+                    }
+                }
             }
-        }
+        state = state.copy(input = filtered)
     }
 
     private suspend fun handleEnter() {
-        isLocked = true
-        val submitted = input.toString()
+        state = state.copy(isLocked = true)
+        val submitted = state.input
 
-        when (entryMode) {
-            MODE_LOGIN -> dispatchLogin(submitted)
-            MODE_SHELL -> dispatchShell(submitted)
-            MODE_APPLICATION -> dispatchApplication(submitted)
-            MODE_NOTES -> dispatchNotes()
+        when (val current = state.mode) {
+            is Mode.Login -> dispatchLogin(current, submitted)
+            is Mode.Shell -> dispatchShell(submitted)
+            is Mode.Application -> dispatchApplication(current, submitted)
+            is Mode.Notes -> dispatchNotes(current)
+            // CAKE/BOSSKEY's "any key" is handled via advance()/onKeyEvent calling
+            // toggleCakeBosskey() directly - matches the original's onKeyDown, which never routed
+            // Enter through processInput while in either of those two screens.
+            Mode.Cake, Mode.BossKey -> Unit
         }
     }
 
     // ---------------------------------------------------------------------
-    // entryMode 0 — login / job-application flow (processInput0 + switchPage case 0)
+    // Mode.Login — login / job-application flow (processInput0 + switchPage case 0)
     // ---------------------------------------------------------------------
-    private suspend fun dispatchLogin(text: String) {
+    private suspend fun dispatchLogin(
+        current: Mode.Login,
+        text: String,
+    ) {
         var advance = false
-        // Mirrors the original's `case 8: qon = 0` and `case 3: qon = 2` switch fallthroughs,
-        // which Kotlin's `when` does not support - normalize qon first so the shared logic below
-        // (the `0 ->` / `2 ->` arms) runs for both the original and the fallthrough-aliased qon.
-        if (qon == 8) qon = 0
-        if (qon == 3) qon = 2
-        when (qon) {
-            0 -> {
+        when (current) {
+            Mode.Login.Initial -> {
                 advance = text == "LOGON" || text == "LOGIN" || text == "USER"
+                if (advance) state = state.copy(mode = Mode.Login.Username)
                 if (text == "HELP" || text == "?") {
                     advance = true
-                    qon = 7
+                    state = state.copy(mode = Mode.Login.Help)
                 }
             }
-            1 -> {
-                advance = text.length > 2
-                isCj = text == "CJOHNSON"
+            // The original aliased qon==8 (help just shown) back to qon==0's own logic - reading
+            // help and pressing anything follows the exact same rules as the initial "> " prompt.
+            Mode.Login.Help -> {
+                advance = text == "LOGON" || text == "LOGIN" || text == "USER"
+                if (advance) state = state.copy(mode = Mode.Login.Username)
+                if (text == "HELP" || text == "?") {
+                    advance = true
+                    state = state.copy(mode = Mode.Login.Help)
+                }
             }
-            2 -> {
-                if (isCj) {
+
+            Mode.Login.Username -> {
+                advance = text.length > 2
+                state = state.copy(isAdmin = text == "CJOHNSON")
+                if (advance) state = state.copy(mode = Mode.Login.Password(isRetry = false))
+            }
+
+            is Mode.Login.Password -> {
+                if (state.isAdmin) {
                     advance = text == "TIER3"
-                    isCj = advance
-                    if (isCj) {
-                        gladosHeader = "GLaDOS v1.07a (c) 1982 Aperture Science, Inc."
-                        gladosPrompt = "^^ADMIN> "
-                    }
+                    state = state.copy(isAdmin = advance)
                 } else {
                     advance = text == "PORTAL" || text == "PORTALS"
                 }
                 // The page always advances - a wrong password redisplays this prompt with an
-                // error (qon 3, aliased to 2 above) instead of blocking input; only a correct
+                // error (the isRetry=true screen) instead of blocking input; only a correct
                 // password actually unlocks the shell.
-                if (advance) {
-                    entryMode = MODE_SHELL
-                } else {
-                    advance = true
-                }
+                state =
+                    state.copy(
+                        mode =
+                            if (advance) {
+                                Mode.Shell()
+                            } else {
+                                advance = true
+                                Mode.Login.Password(isRetry = true)
+                            },
+                    )
             }
-            4 -> {
-                if (text == "CONTINUE") advance = true
-                if (text == "QUIT") {
-                    qon = 0
-                    advance = true
-                    entryMode = MODE_SHELL
-                }
-            }
-            5 -> {
+
+            Mode.Login.ApplicationIntro -> {
                 if (text == "CONTINUE") {
                     advance = true
-                    qon = 0
-                    entryMode = MODE_APPLICATION
+                    state = state.copy(mode = Mode.Login.ApplicationUidDisplay)
                 }
                 if (text == "QUIT") {
-                    qon = 0
                     advance = true
-                    entryMode = MODE_SHELL
+                    state = state.copy(mode = Mode.Shell())
                 }
             }
-            9 -> {
-                if (text == "THECAKEISALIE") {
-                    entryMode = MODE_CAKE
+
+            Mode.Login.ApplicationUidDisplay -> {
+                if (text == "CONTINUE") {
+                    advance = true
+                    state = state.copy(mode = Mode.Application(questionNumber = 1))
                 }
+                if (text == "QUIT") {
+                    advance = true
+                    state = state.copy(mode = Mode.Shell())
+                }
+            }
+
+            Mode.Login.UinEntry -> {
+                state = state.copy(mode = if (text == "THECAKEISALIE") Mode.Cake else Mode.Login.Terminal)
                 advance = true
             }
             // Terminal "does not match" screen - there is no way back from here.
-            10 -> advance = false
-            else -> advance = true
+            Mode.Login.Terminal -> advance = false
         }
 
         finishTurn(advance)
     }
 
     // ---------------------------------------------------------------------
-    // entryMode 1 — GLaDOS shell (processInput1)
+    // Mode.Shell — GLaDOS shell (processInput1)
     // ---------------------------------------------------------------------
     private suspend fun dispatchShell(rawText: String) {
         val text = rawText.trimStart()
         if (text.isEmpty()) {
             // The original returns immediately without even clearing the field.
-            _liveLine.value = pageContent + input
-            isLocked = false
+            _liveLine.value = state.pageContent + state.input
+            state = state.copy(isLocked = false)
             return
         }
         val args = text.split(" ")
-        gladosMessage = ""
+        var message = ""
         when (args[0]) {
-            "THECAKEISALIE" -> entryMode = MODE_CAKE
+            "THECAKEISALIE" -> state = state.copy(mode = Mode.Cake)
 
             "DIR", "CATALOG", "DIRECTORY", "LIST", "LS", "CAT" -> {
-                gladosMessage =
-                    if (isCj) {
+                message =
+                    if (state.isAdmin) {
                         "\nDISK VOLUME 255 [WORKSTATION CJOHNSON]\n\n" +
                             "     I  019  APPLY.EXE\n     I  004  NOTES.EXE\n\n" +
                             "2 FILE(S) IN 23 BLOCKS\n"
@@ -368,11 +385,11 @@ class TerminalEngine(
                     }
             }
 
-            "IP" -> gladosMessage = " \n\nuid:$uid\n"
+            "IP" -> message = " \n\nuid:${state.uid}\n"
 
             "HELP", "LIB", "?" -> {
-                gladosMessage =
-                    if (isCj) {
+                message =
+                    if (state.isAdmin) {
                         " \n\nLIB\n     NOTES\n     APPEND\n     ATTRIB\n     COPY\n     DIR\n     ERASE\n" +
                             "     FORMAT\n     INTERROGATE\n     LIB\n     PLAY\n     RENAME\n     TAPEDISK"
                     } else {
@@ -387,11 +404,11 @@ class TerminalEngine(
             }
 
             "APPEND", "ATTRIB", "COPY", "FORMAT", "ERASE", "RENAME" ->
-                gladosMessage = "\n\nERROR 15 [Disk is write protected]"
+                message = "\n\nERROR 15 [Disk is write protected]"
 
             "PLAY" ->
                 when {
-                    args.size == 1 -> gladosMessage = "\n\nERROR 03 [What would you like to play?]"
+                    args.size == 1 -> message = "\n\nERROR 03 [What would you like to play?]"
                     args.getOrNull(1) == "PORTAL" -> {
                         farewell("ERROR: TRAILER NOT FOUND")
                         return
@@ -399,77 +416,86 @@ class TerminalEngine(
                 }
 
             "INTERROGATE" ->
-                gladosMessage =
+                message =
                     when {
                         args.size == 1 -> "\n\nERROR 02 [Command requires at least one parameter]"
-                        isCj -> "\n\nERROR 07 [Unknown Employee]"
+                        state.isAdmin -> "\n\nERROR 07 [Unknown Employee]"
                         else -> "\n\nERROR 01 [Illegal attempt to initiate disciplinary action]"
                     }
 
-            "TAPEDISK" -> gladosMessage = "\n\nERROR 18 [User not authorized to transfer system tapes]"
+            "TAPEDISK" -> message = "\n\nERROR 18 [User not authorized to transfer system tapes]"
 
             "NOTES", "NOTES.EXE" -> {
-                if (isCj) {
-                    qon = 50
-                    entryMode = MODE_NOTES
-                    notesPage = 1
+                if (state.isAdmin) {
+                    state = state.copy(mode = Mode.Notes(page = 1))
                 } else {
-                    gladosMessage = "\n\nERROR 24 [File '${args[0]}' not found]"
+                    message = "\n\nERROR 24 [File '${args[0]}' not found]"
                 }
             }
 
-            "APPLY", "APPLY.EXE" -> {
-                qon = 3
-                entryMode = MODE_LOGIN
-            }
+            "APPLY", "APPLY.EXE" -> state = state.copy(mode = Mode.Login.ApplicationIntro)
 
-            else -> gladosMessage = "\n\nERROR 24 [File '${args[0]}' not found]"
+            else -> message = "\n\nERROR 24 [File '${args[0]}' not found]"
         }
 
+        // Only overwrite mode with the freshly-built message if a branch above didn't already
+        // switch to a different screen entirely (THECAKEISALIE/NOTES/APPLY) - those already set
+        // their own target mode, which this must not clobber.
+        if (state.mode is Mode.Shell) {
+            state = state.copy(mode = Mode.Shell(message = message))
+        }
         showNextPage()
     }
 
     // ---------------------------------------------------------------------
-    // entryMode 2 — job application questionnaire (processInput2)
+    // Mode.Application — job application questionnaire (processInput2)
     // ---------------------------------------------------------------------
-    private suspend fun dispatchApplication(text: String) {
+    private suspend fun dispatchApplication(
+        current: Mode.Application,
+        text: String,
+    ) {
         // Matches an original off-by-one: once qon reaches the question count, Enter ends the
         // form immediately without validating (or submitting) whatever was typed for the last
         // question.
-        if (qon >= TerminalData.questions.size) {
-            qon = 8
-            entryMode = MODE_LOGIN
+        if (current.questionNumber >= TerminalData.questions.size) {
+            state = state.copy(mode = Mode.Login.UinEntry)
             showNextPage()
             return
         }
 
-        val question = TerminalData.questions[qon - 1]
+        val question = TerminalData.questions[current.questionNumber - 1]
         var advance = false
         if (question.type != QuestionType.TEXT) {
             val choice = text.toIntOrNull()
             if (choice != null && choice > 0 && choice <= question.choices.size) {
                 advance = true
             }
-        } else if (qon != 51) {
+        } else if (current.questionNumber != 51) {
             advance = true
         }
-        if (text == "QUIT") {
-            qon = 0
-            entryMode = MODE_SHELL
-            advance = true
-        }
+
+        state =
+            state.copy(
+                mode =
+                    if (text == "QUIT") {
+                        advance = true
+                        Mode.Shell()
+                    } else if (advance) {
+                        current.copy(questionNumber = current.questionNumber + 1, pageOffset = 0)
+                    } else {
+                        current
+                    },
+            )
 
         finishTurn(advance)
     }
 
     // ---------------------------------------------------------------------
-    // entryMode 5 — NOTES.EXE reader (processInput5)
+    // Mode.Notes — NOTES.EXE reader (processInput5)
     // ---------------------------------------------------------------------
-    private suspend fun dispatchNotes() {
-        notesPage += 1
-        if (notesPage > MAX_NOTES_PAGE) {
-            entryMode = MODE_SHELL
-        }
+    private suspend fun dispatchNotes(current: Mode.Notes) {
+        val nextPage = current.page + 1
+        state = state.copy(mode = if (nextPage > MAX_NOTES_PAGE) Mode.Shell() else Mode.Notes(page = nextPage))
         showNextPage()
     }
 
@@ -482,30 +508,24 @@ class TerminalEngine(
         if (advance) {
             showNextPage()
         } else {
-            input.clear()
-            _liveLine.value = pageContent
-            isLocked = false
+            state = state.copy(input = "", isLocked = false)
+            _liveLine.value = state.pageContent
         }
     }
 
-    /** Mirrors switchPage(): clears the screen, resets pageOffset, then dispatches on the
-     * (possibly just-changed) entryMode - exactly one clear-and-redraw per page transition. */
+    /** Mirrors switchPage(): clears the screen, then dispatches on the (possibly just-changed)
+     * [state]'s mode - exactly one clear-and-redraw per page transition. Unlike the original's
+     * `qon++`-then-lookup, the mode already holds the exact target screen by the time this runs
+     * (every transition above sets it directly), so there's no index arithmetic left to do here. */
     private suspend fun showNextPage() {
         clearScreen()
-        pageOffset = 0
-        input.clear()
-        when (entryMode) {
-            MODE_LOGIN -> {
-                qon++
-                reveal(TerminalData.qar[qon], TerminalData.qdelay[qon])
-            }
-            MODE_SHELL -> reveal(gladosHeader + gladosMessage + gladosPrompt, GLADOS_SPEED)
-            MODE_APPLICATION -> {
-                qon++
-                showQuestion()
-            }
-            MODE_BOSSKEY -> revealInstant(BOSSKEY_SPREADSHEET)
-            MODE_CAKE -> {
+        state = state.copy(input = "")
+        when (val current = state.mode) {
+            is Mode.Login -> reveal(TerminalData.qar[current.qarIndex], TerminalData.qdelay[current.qarIndex])
+            is Mode.Shell -> reveal(gladosHeader + current.message + gladosPrompt, GLADOS_SPEED)
+            is Mode.Application -> showQuestion()
+            Mode.BossKey -> revealInstant(BOSSKEY_SPREADSHEET)
+            Mode.Cake -> {
                 reveal(CAKE_MONOLOGUE_1, 0, unlockAfter = false)
                 maybeDelay(2000) // stand-in for security02.flv playback
                 reveal(CAKE_MONOLOGUE_2, 0)
@@ -514,25 +534,26 @@ class TerminalEngine(
             // ends in "[MORE]"/"[END]" (see TerminalData) - nothing appended here, faithfully
             // (the original never printed a "press ENTER to continue" hint either; any accepted
             // key already advances a NOTES.EXE page regardless, see onKeyEvent's MODE_NOTES arm).
-            MODE_NOTES -> reveal(TerminalData.cjHistory[notesPage - 1], NOTES_SPEED)
+            is Mode.Notes -> reveal(TerminalData.cjHistory[current.page - 1], NOTES_SPEED)
         }
     }
 
     private suspend fun showQuestion() {
-        val question = TerminalData.questions[qon - 1]
-        val header = "Form FORMS-EN-2873-FORM - Page $qon\n\n${question.text}\n\n"
+        val current = state.mode as Mode.Application
+        val question = TerminalData.questions[current.questionNumber - 1]
+        val header = "Form FORMS-EN-2873-FORM - Page ${current.questionNumber}\n\n${question.text}\n\n"
         if (question.type == QuestionType.TEXT) {
             reveal(header + "> ", 25)
             return
         }
-        reveal(header, if (pageOffset > 0) 1 else 15, unlockAfter = false)
+        reveal(header, if (current.pageOffset > 0) 1 else 15, unlockAfter = false)
 
         val total = question.choices.size
         val padWidth = (total + 1).toString().length
-        val pageEnd = minOf(pageOffset + PAGE_SIZE, total)
+        val pageEnd = minOf(current.pageOffset + PAGE_SIZE, total)
         val body =
             buildString {
-                for (i in pageOffset until pageEnd) {
+                for (i in current.pageOffset until pageEnd) {
                     append((i + 1).toString().padStart(padWidth, '0'))
                     append("] ")
                     append(question.choices[i])
@@ -549,7 +570,7 @@ class TerminalEngine(
     }
 
     private suspend fun toggleCakeBosskey() {
-        entryMode = if (entryMode == MODE_CAKE) MODE_BOSSKEY else MODE_CAKE
+        state = state.copy(mode = if (state.mode == Mode.Cake) Mode.BossKey else Mode.Cake)
         showNextPage()
     }
 
@@ -576,40 +597,42 @@ class TerminalEngine(
      * `ui-web`) see exactly today's timing (`instantReveal` defaults to `false`).
      */
     private suspend fun maybeDelay(ms: Long) {
-        if (!instantReveal) delay(ms)
+        if (!instantReveal) {
+            delay(ms.milliseconds)
+        }
     }
 
     /**
      * Types [text] out one character at a time, appending onto whatever is already in
-     * [pageContent] (call [clearScreen] first for a fresh page - a full page is usually built
-     * from several chained `reveal`/`revealInstant` calls, e.g. a question's header followed by
-     * its instantly-revealed choice list, matching how the original's `formatQuestion()` made
-     * one `placeText()` call - which cleared - followed by manually placed choice text - which
-     * didn't). delayMs <= 0 reveals instantly.
+     * [EngineState.pageContent] (call [clearScreen] first for a fresh page - a full page is
+     * usually built from several chained `reveal`/`revealInstant` calls, e.g. a question's header
+     * followed by its instantly-revealed choice list, matching how the original's
+     * `formatQuestion()` made one `placeText()` call - which cleared - followed by manually
+     * placed choice text - which didn't). delayMs <= 0 reveals instantly.
      *
      * `^` (the original's newline marker) becomes a line break and `@` (its UID placeholder)
      * is substituted, exactly as `placeText()` did in the source AS2 - this lets strings sourced
      * verbatim from [TerminalData] be passed straight through unmodified. Lines are also
-     * word-wrapped to [wrapWidth] (see [setViewportWidth] for who sets it to what and why):
-     * defaults to [WRAP_WIDTH], matching the original's own pixel-width auto-wrap threshold.
-     * For a host that redraws by diffing/repositioning a cursor rather than replacing whole-page
-     * content wholesale (observed with Mosaic), a single long line left unwrapped - or wrapped
-     * wider than that host's actual terminal column count - soft-wraps in the real terminal
-     * while still animating, which desyncs the host's own redraw bookkeeping and leaves stray
-     * duplicate rows behind; such a host must keep [wrapWidth] at or below its real column count
-     * via [setViewportWidth]. A host that instead redraws by wholesale-replacing rendered
-     * content (no cursor/diffing involved at all) has no such risk and may leave hard-wrapping
-     * to its own rendering entirely by setting [wrapWidth] far wider than any real line.
+     * word-wrapped to [EngineState.wrapWidth] (see [setViewportWidth] for who sets it to what and
+     * why): defaults to [WRAP_WIDTH], matching the original's own pixel-width auto-wrap
+     * threshold. For a host that redraws by diffing/repositioning a cursor rather than replacing
+     * whole-page content wholesale (observed with Mosaic), a single long line left unwrapped - or
+     * wrapped wider than that host's actual terminal column count - soft-wraps in the real
+     * terminal while still animating, which desyncs the host's own redraw bookkeeping and leaves
+     * stray duplicate rows behind; such a host must keep the wrap width at or below its real
+     * column count via [setViewportWidth]. A host that instead redraws by wholesale-replacing
+     * rendered content (no cursor/diffing involved at all) has no such risk and may leave
+     * hard-wrapping to its own rendering entirely by setting it far wider than any real line.
      */
     private suspend fun reveal(
         text: String,
         delayMs: Int,
         unlockAfter: Boolean = true,
     ) {
-        val logicalLines = text.replace("@", "[$uid]").replace("^", "\n").split("\n")
-        val lines = logicalLines.flatMap { wordWrap(it, wrapWidth) }
+        val logicalLines = text.replace("@", "[${state.uid}]").replace("^", "\n").split("\n")
+        val lines = logicalLines.flatMap { wordWrap(it, state.wrapWidth) }
         for ((index, line) in lines.withIndex()) {
-            val base = pageContent
+            val base = state.pageContent
             if (delayMs > 0) {
                 val sb = StringBuilder()
                 for (ch in line) {
@@ -617,22 +640,22 @@ class TerminalEngine(
                     _liveLine.value = base + sb
                     maybeDelay(delayMs.toLong())
                 }
-                pageContent = base + sb
+                state = state.copy(pageContent = base + sb)
             } else {
-                pageContent = base + line
-                _liveLine.value = pageContent
+                state = state.copy(pageContent = base + line)
+                _liveLine.value = state.pageContent
             }
             if (index != lines.lastIndex) {
-                pageContent += "\n"
+                state = state.copy(pageContent = state.pageContent + "\n")
             }
         }
-        _liveLine.value = pageContent
+        _liveLine.value = state.pageContent
         if (unlockAfter) {
-            isLocked = false
+            state = state.copy(isLocked = false)
         }
     }
 
-    /** Reveals every line instantly, appending onto [pageContent] (see [reveal]). */
+    /** Reveals every line instantly, appending onto [EngineState.pageContent] (see [reveal]). */
     private suspend fun revealInstant(text: String) = reveal(text, 0)
 
     private fun wordWrap(
@@ -664,19 +687,23 @@ class TerminalEngine(
         return result
     }
 
-    companion object {
-        // Public (not private) so a stateless host driving the batch API can classify a restored
-        // EngineState.entryMode without duplicating these values - e.g. to tell whether the
-        // current page has a line-based input zone to submit to, or is a MODE_NOTES/CAKE/BOSSKEY
-        // "any key" page to call advance() on instead. Values are stable (mirror the original
-        // AS2's entryMode), so exposing them is a plain visibility widening, not a new contract.
-        const val MODE_LOGIN = 0
-        const val MODE_SHELL = 1
-        const val MODE_APPLICATION = 2
-        const val MODE_BOSSKEY = 3
-        const val MODE_CAKE = 4
-        const val MODE_NOTES = 5
+    /** Which [TerminalData.qar]/[TerminalData.qdelay] entry each [Mode.Login] state reveals -
+     * purely a rendering detail local to [showNextPage], unlike the original AS2 port's `qon`
+     * (which also doubled as the persisted state identifier - see [Mode]'s doc). */
+    private val Mode.Login.qarIndex: Int
+        get() =
+            when (this) {
+                Mode.Login.Initial -> 0
+                Mode.Login.Username -> 1
+                is Mode.Login.Password -> if (isRetry) 3 else 2
+                Mode.Login.ApplicationIntro -> 4
+                Mode.Login.ApplicationUidDisplay -> 5
+                Mode.Login.Help -> 8
+                Mode.Login.UinEntry -> 9
+                Mode.Login.Terminal -> 10
+            }
 
+    companion object {
         private const val GLADOS_SPEED = 7
         private const val NOTES_SPEED = 3
         private const val MAX_INPUT_LENGTH = 65
@@ -686,7 +713,7 @@ class TerminalEngine(
         const val PAGE_SIZE = 104
 
         /**
-         * Default [wrapWidth], matching the original's own pixel-width auto-wrap threshold.
+         * Default wrap width, matching the original's own pixel-width auto-wrap threshold.
          * Public so a CLI-style host can reproduce the "cap at this, never wrap wider" behavior
          * itself when calling [setViewportWidth] with a real (possibly wider) terminal column
          * count - see that function's doc.

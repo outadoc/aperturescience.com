@@ -1,5 +1,6 @@
 package com.aperturescience.terminal.minitel
 
+import com.aperturescience.terminal.Mode
 import com.aperturescience.terminal.TerminalEngine
 import com.aperturescience.terminal.data.TerminalData
 import fr.outadoc.minipavi.core.model.FunctionKey
@@ -51,7 +52,8 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
     val lastChunkIndex = chunksBefore.lastIndex
     val functionKey = (request.event as? GatewayRequest.Event.KeyboardInput)?.key
 
-    val q21PaginationActive = isQ21PaginationActive(state.entryMode, state.qon)
+    val mode = state.mode.toDomain()
+    val q21PaginationActive = isQ21PaginationActive(mode)
 
     var chunkIndex = state.chunkIndex
     when {
@@ -77,11 +79,11 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
             functionKey == FunctionKey.Correction -> {
             // no-op
         }
-        chunkIndex == lastChunkIndex && hasOpenInputZone(state.entryMode) && functionKey == FunctionKey.Envoi -> {
+        chunkIndex == lastChunkIndex && hasOpenInputZone(mode) && functionKey == FunctionKey.Envoi -> {
             engine.submitLine(request.userInput.firstOrNull().orEmpty())
             chunkIndex = 0
         }
-        chunkIndex == lastChunkIndex && isAnyKeyMode(state.entryMode) && functionKey != null -> {
+        chunkIndex == lastChunkIndex && isAnyKeyMode(mode) && functionKey != null -> {
             engine.advance()
             chunkIndex = 0
         }
@@ -109,29 +111,17 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
     return render(engine, chunkIndex)
 }
 
-private fun hasOpenInputZone(entryMode: Int): Boolean =
-    entryMode == TerminalEngine.MODE_LOGIN ||
-        entryMode == TerminalEngine.MODE_SHELL ||
-        entryMode == TerminalEngine.MODE_APPLICATION
+private fun hasOpenInputZone(mode: Mode): Boolean = mode is Mode.Login || mode is Mode.Shell || mode is Mode.Application
 
-private fun isAnyKeyMode(entryMode: Int): Boolean =
-    entryMode == TerminalEngine.MODE_NOTES ||
-        entryMode == TerminalEngine.MODE_CAKE ||
-        entryMode == TerminalEngine.MODE_BOSSKEY
+private fun isAnyKeyMode(mode: Mode): Boolean = mode is Mode.Notes || mode is Mode.Cake || mode is Mode.BossKey
 
-private fun isQ21PaginationActive(
-    entryMode: Int,
-    qon: Int,
-): Boolean {
-    if (entryMode != TerminalEngine.MODE_APPLICATION) return false
-    val question = TerminalData.questions.getOrNull(qon - 1) ?: return false
+private fun isQ21PaginationActive(mode: Mode): Boolean {
+    if (mode !is Mode.Application) return false
+    val question = TerminalData.questions.getOrNull(mode.questionNumber - 1) ?: return false
     return question.choices.size > TerminalEngine.PAGE_SIZE
 }
 
-private fun isPasswordPrompt(
-    entryMode: Int,
-    qon: Int,
-): Boolean = entryMode == TerminalEngine.MODE_LOGIN && (qon == 2 || qon == 3)
+private fun isPasswordPrompt(mode: Mode): Boolean = mode is Mode.Login.Password
 
 /** Chunks [engine]'s current output, renders [chunkIndex]'s slice as one Vidéotex frame, and
  * persists everything needed to resume on the next call. */
@@ -146,7 +136,7 @@ private fun render(
     val isLastChunk = safeIndex == chunks.lastIndex
     val state = engine.captureState()
 
-    val openInputZone = isLastChunk && !pendingDisconnect && hasOpenInputZone(state.entryMode)
+    val openInputZone = isLastChunk && !pendingDisconnect && hasOpenInputZone(state.mode)
 
     val content =
         buildVideotex {
@@ -164,7 +154,7 @@ private fun render(
                 col = inputCol,
                 line = inputLine,
                 length = inputLength,
-                substituteChar = if (isPasswordPrompt(state.entryMode, state.qon)) "*" else "",
+                substituteChar = if (isPasswordPrompt(state.mode)) "*" else "",
                 submitWith = setOf(FunctionKey.Envoi, FunctionKey.Suite, FunctionKey.Retour),
             )
         } else {

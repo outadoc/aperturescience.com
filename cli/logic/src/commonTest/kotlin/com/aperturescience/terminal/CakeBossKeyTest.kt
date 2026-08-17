@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-class CakeBosskeyTest {
+class CakeBossKeyTest {
     @Test
     fun `THECAKEISALIE shows the security-feed monologue`() =
         runTest {

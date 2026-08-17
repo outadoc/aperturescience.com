@@ -1,6 +1,5 @@
 package com.aperturescience.terminal.minitel
 
-import com.aperturescience.terminal.TerminalEngine
 import fr.outadoc.minipavi.core.model.FunctionKey
 import fr.outadoc.minipavi.core.model.GatewayRequest
 import fr.outadoc.minipavi.core.model.GatewayRequest.Event
@@ -15,14 +14,8 @@ class TurnHandlerTest {
     // session would look like right before typing "NOTES".
     private val adminShellState =
         MinitelSessionState(
-            entryMode = TerminalEngine.MODE_SHELL,
-            qon = 0,
-            isCj = true,
-            notesPage = 0,
-            pageOffset = 0,
-            gladosHeader = "GLaDOS v1.07a (c) 1982 Aperture Science, Inc.",
-            gladosPrompt = "^^ADMIN> ",
-            gladosMessage = "",
+            mode = MinitelMode.Shell(),
+            isAdmin = true,
             uid = "TESTUID0001",
             pageContent = "",
             input = "",
@@ -60,8 +53,7 @@ class TurnHandlerTest {
     fun `a NOTES-EXE page spanning multiple screens advances on Suite, then Envoi once caught up`() {
         // "NOTES" typed at the shell prompt, submitted with Envoi.
         val page1Head = turn(adminShellState, FunctionKey.Envoi, userInput = listOf("NOTES"))
-        assertEquals(TerminalEngine.MODE_NOTES, page1Head.state.entryMode)
-        assertEquals(1, page1Head.state.notesPage)
+        assertEquals(MinitelMode.Notes(page = 1), page1Head.state.mode)
         assertEquals(0, page1Head.state.chunkIndex)
 
         // Envoi does nothing while there's more of this same page queued up - only Suite reveals
@@ -72,12 +64,12 @@ class TurnHandlerTest {
 
         val page1Tail = turn(page1Head.state, FunctionKey.Suite)
         assertNotEquals(page1Head.content, page1Tail.content)
-        assertEquals(page1Head.state.notesPage, page1Tail.state.notesPage)
+        assertEquals(page1Head.state.mode, page1Tail.state.mode)
         assertEquals(page1Head.state.chunkIndex + 1, page1Tail.state.chunkIndex)
 
         // Now truly caught up with page 1 - the next Envoi must move on to NOTES page 2.
         val page2Head = turn(page1Tail.state, FunctionKey.Envoi)
-        assertEquals(page1Tail.state.notesPage + 1, page2Head.state.notesPage)
+        assertEquals(MinitelMode.Notes(page = 2), page2Head.state.mode)
         assertEquals(0, page2Head.state.chunkIndex)
     }
 
@@ -92,11 +84,11 @@ class TurnHandlerTest {
             response = turn(response.state, FunctionKey.Envoi) // page N+1, chunk 0
         }
         response = turn(response.state, FunctionKey.Suite) // page 4, chunk 1
-        assertEquals(4, response.state.notesPage)
+        assertEquals(MinitelMode.Notes(page = 4), response.state.mode)
         assertEquals(1, response.state.chunkIndex)
 
         val backToShell = turn(response.state, FunctionKey.Envoi)
-        assertEquals(TerminalEngine.MODE_SHELL, backToShell.state.entryMode)
+        assertEquals(MinitelMode.Shell(), backToShell.state.mode)
     }
 
     /** Regression test for a related word-wrap bug: a wrapped line exactly [ScreenChunker.COLUMNS]

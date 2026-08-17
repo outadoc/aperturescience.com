@@ -1,20 +1,15 @@
 package com.aperturescience.terminal.minitel
 
 import com.aperturescience.terminal.EngineState
+import com.aperturescience.terminal.Mode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class MinitelSessionStateTest {
     private val sampleEngineState =
         EngineState(
-            entryMode = 2,
-            qon = 21,
-            isCj = true,
-            notesPage = 3,
-            pageOffset = 104,
-            gladosHeader = "GLaDOS v1.07a (c) 1982 Aperture Science, Inc.",
-            gladosPrompt = "^^ADMIN> ",
-            gladosMessage = "\n\nERROR 24 [File 'X' not found]",
+            mode = Mode.Application(questionNumber = 21, pageOffset = 104),
+            isAdmin = true,
             uid = "ABCDEF012345",
             pageContent = "Form FORMS-EN-2873-FORM - Page 21\n\nsome question text\n\n001] a\n002] b\n> ",
             input = "42",

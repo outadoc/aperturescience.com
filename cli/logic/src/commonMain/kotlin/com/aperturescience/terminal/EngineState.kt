@@ -9,14 +9,8 @@ package com.aperturescience.terminal
  * [TerminalEngine.captureState] and the `initialState` constructor parameter.
  */
 data class EngineState(
-    val entryMode: Int,
-    val qon: Int,
-    val isCj: Boolean,
-    val notesPage: Int,
-    val pageOffset: Int,
-    val gladosHeader: String,
-    val gladosPrompt: String,
-    val gladosMessage: String,
+    val mode: Mode,
+    val isAdmin: Boolean,
     val uid: String,
     val pageContent: String,
     val input: String,

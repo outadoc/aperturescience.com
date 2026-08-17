@@ -6,21 +6,16 @@ import kotlinx.serialization.Serializable
 /**
  * The `TState` minipavi-kotlin's `minitelService<MinitelSessionState>(...)` round-trips through
  * the MiniPavi gateway on every call - the only place in this module that touches
- * `kotlinx.serialization`, mirroring [EngineState] field-for-field plus two fields with no
- * `EngineState` equivalent: [chunkIndex] (this adapter's own screen-height pagination cursor
- * within the last turn's output, see [ScreenChunker]) and [pendingDisconnect] (farewell shown,
- * waiting for the next keypress to actually disconnect - see [TurnHandler]).
+ * `kotlinx.serialization`, mirroring [EngineState] field-for-field (see [MinitelMode] for how
+ * [EngineState.mode] is mirrored specifically) plus two fields with no `EngineState` equivalent:
+ * [chunkIndex] (this adapter's own screen-height pagination cursor within the last turn's output,
+ * see [ScreenChunker]) and [pendingDisconnect] (farewell shown, waiting for the next keypress to
+ * actually disconnect - see [TurnHandler]).
  */
 @Serializable
 data class MinitelSessionState(
-    val entryMode: Int,
-    val qon: Int,
-    val isCj: Boolean,
-    val notesPage: Int,
-    val pageOffset: Int,
-    val gladosHeader: String,
-    val gladosPrompt: String,
-    val gladosMessage: String,
+    val mode: MinitelMode,
+    val isAdmin: Boolean,
     val uid: String,
     val pageContent: String,
     val input: String,
@@ -31,14 +26,8 @@ data class MinitelSessionState(
 ) {
     fun toEngineState(): EngineState =
         EngineState(
-            entryMode = entryMode,
-            qon = qon,
-            isCj = isCj,
-            notesPage = notesPage,
-            pageOffset = pageOffset,
-            gladosHeader = gladosHeader,
-            gladosPrompt = gladosPrompt,
-            gladosMessage = gladosMessage,
+            mode = mode.toDomain(),
+            isAdmin = isAdmin,
             uid = uid,
             pageContent = pageContent,
             input = input,
@@ -54,14 +43,8 @@ data class MinitelSessionState(
         ): MinitelSessionState =
             with(engineState) {
                 MinitelSessionState(
-                    entryMode = entryMode,
-                    qon = qon,
-                    isCj = isCj,
-                    notesPage = notesPage,
-                    pageOffset = pageOffset,
-                    gladosHeader = gladosHeader,
-                    gladosPrompt = gladosPrompt,
-                    gladosMessage = gladosMessage,
+                    mode = mode.toData(),
+                    isAdmin = isAdmin,
                     uid = uid,
                     pageContent = pageContent,
                     input = input,
@@ -82,14 +65,8 @@ data class MinitelSessionState(
          */
         fun initial(): MinitelSessionState =
             MinitelSessionState(
-                entryMode = 0,
-                qon = 0,
-                isCj = false,
-                notesPage = 0,
-                pageOffset = 0,
-                gladosHeader = "",
-                gladosPrompt = "",
-                gladosMessage = "",
+                mode = MinitelMode.Login.Initial,
+                isAdmin = false,
                 uid = "",
                 pageContent = "",
                 input = "",
