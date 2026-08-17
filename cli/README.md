@@ -91,8 +91,11 @@ To try it out:
    ```sh
    ui-minitel/scripts/start.sh
    ```
+   This stays attached, streaming both containers' logs to stdout — handy
+   for watching the requests MiniPavi sends to `ui-minitel` — until you stop
+   it with Ctrl+C, which also stops the containers.
 
-`ui-minitel/scripts/stop.sh` tears the containers back down.
+`ui-minitel/scripts/stop.sh` fully tears the containers and network back down.
 
 The program takes over the whole terminal on launch, like `vim` or `htop`
 (using the terminal's alternate-screen buffer) — whatever was on screen
