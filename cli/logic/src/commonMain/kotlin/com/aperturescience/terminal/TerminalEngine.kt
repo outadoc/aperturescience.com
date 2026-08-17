@@ -36,7 +36,10 @@ import kotlin.random.Random
  *    a browser.
  *  - The cosmetic "glitching UID digits" and rare cake-image flicker are not reproduced.
  */
-class TerminalEngine {
+class TerminalEngine(
+    private val instantReveal: Boolean = false,
+    initialState: EngineState? = null,
+) {
     private val _liveLine = MutableStateFlow("")
     val liveLine: StateFlow<String> = _liveLine.asStateFlow()
 
@@ -45,31 +48,40 @@ class TerminalEngine {
     /** True once the session should end (LOGOUT/PLAY PORTAL) - see the class doc. */
     val exitRequested: StateFlow<Boolean> = _exitRequested.asStateFlow()
 
-    private var isLocked = true
+    private var isLocked = initialState?.isLocked ?: true
 
     private lateinit var scope: CoroutineScope
 
-    private val input = StringBuilder()
+    private val input = StringBuilder(initialState?.input ?: "")
 
     /** Everything drawn on the current page so far, up to (not including) the live input. */
-    private var pageContent = ""
+    private var pageContent = initialState?.pageContent ?: ""
 
     // --- state mirroring DoAction.as globals ---
-    private var entryMode = MODE_LOGIN
-    private var qon = 0
-    private var isCj = false
-    private var notesPage = 0
-    private var pageOffset = 0
-    private var gladosHeader = "GLaDOS v1.07 (c) 1982 Aperture Science, Inc."
-    private var gladosPrompt = " ^^B:\\> "
-    private var gladosMessage = ""
-    private val uid = synthesizeUid()
+    private var entryMode = initialState?.entryMode ?: MODE_LOGIN
+    private var qon = initialState?.qon ?: 0
+    private var isCj = initialState?.isCj ?: false
+    private var notesPage = initialState?.notesPage ?: 0
+    private var pageOffset = initialState?.pageOffset ?: 0
+    private var gladosHeader = initialState?.gladosHeader ?: "GLaDOS v1.07 (c) 1982 Aperture Science, Inc."
+    private var gladosPrompt = initialState?.gladosPrompt ?: " ^^B:\\> "
+    private var gladosMessage = initialState?.gladosMessage ?: ""
+    private val uid = initialState?.uid ?: synthesizeUid()
 
     // Defaults to WRAP_WIDTH so existing behavior (and tests/hosts that never call
     // setViewportWidth) is unchanged; a host UI narrower than that must call
     // setViewportWidth before/while booting to avoid the redraw-desync bug described on
     // [reveal].
-    private var wrapWidth = WRAP_WIDTH
+    private var wrapWidth = initialState?.wrapWidth ?: WRAP_WIDTH
+
+    init {
+        // _liveLine defaults to "" to match today's behavior (nothing is shown before boot()),
+        // which is exactly right for the no-initialState case. Restoring from a captured
+        // EngineState is different: the caller expects the resumed engine to already be showing
+        // the same content the original was, not a blank screen until the next turn - so seed it
+        // here the same way updateLiveLine() would from the restored pageContent/input.
+        if (initialState != null) updateLiveLine()
+    }
 
     /**
      * Sets the exact column width future [reveal]-wrapped lines are hard-wrapped to - a plain
@@ -86,12 +98,79 @@ class TerminalEngine {
         if (columns > 0) wrapWidth = columns
     }
 
+    /**
+     * Snapshots every field that varies turn-to-turn, for a host that can't keep this instance
+     * alive in memory between turns (e.g. a stateless request/response session) - pass the result
+     * to another `TerminalEngine`'s [initialState] constructor parameter to resume exactly where
+     * this one left off. See [EngineState] and the "batch API" section below for the intended
+     * pairing (`instantReveal = true` + [bootTurn]/[submitLine]/[advance]/[page]).
+     */
+    fun captureState(): EngineState =
+        EngineState(
+            entryMode = entryMode,
+            qon = qon,
+            isCj = isCj,
+            notesPage = notesPage,
+            pageOffset = pageOffset,
+            gladosHeader = gladosHeader,
+            gladosPrompt = gladosPrompt,
+            gladosMessage = gladosMessage,
+            uid = uid,
+            pageContent = pageContent,
+            input = input.toString(),
+            wrapWidth = wrapWidth,
+            isLocked = isLocked,
+        )
+
     fun boot(coroutineScope: CoroutineScope) {
         scope = coroutineScope
-        scope.launch {
-            clearScreen()
-            reveal(TerminalData.qar[0], TerminalData.qdelay[0])
+        scope.launch { bootBody() }
+    }
+
+    private suspend fun bootBody() {
+        clearScreen()
+        reveal(TerminalData.qar[0], TerminalData.qdelay[0])
+    }
+
+    // ---------------------------------------------------------------------
+    // Synchronous "batch" API for stateless hosts (e.g. a request/response Minitel service) that
+    // can't stay subscribed to a long-lived session the way boot()/onKeyEvent() assume - a host
+    // like that only ever sees one already-validated line of input per turn, never individual
+    // keystrokes. Meaningful only with instantReveal = true: every call below runs an entire turn
+    // to completion without ever touching `scope` (unlike boot()/onKeyEvent(), which fire-and-
+    // forget via `scope.launch`), then returns the resulting [liveLine] snapshot directly. Callers
+    // persist/restore session state via [EngineState]/[captureState]/the [initialState]
+    // constructor parameter instead of keeping this instance alive in memory between turns.
+    // ---------------------------------------------------------------------
+
+    /** [boot]'s synchronous equivalent - only meaningful on a freshly-constructed engine. */
+    suspend fun bootTurn(): String {
+        bootBody()
+        return liveLine.value
+    }
+
+    /** Submits [line] as a whole already-validated line of input - the batch-API equivalent of
+     * typing [line] character by character via [onKeyEvent] and then pressing Enter. */
+    suspend fun submitLine(line: String): String {
+        setInputLine(line)
+        handleEnter()
+        return liveLine.value
+    }
+
+    /** The "any accepted key" equivalent [onKeyEvent] uses for MODE_NOTES/MODE_CAKE/MODE_BOSSKEY,
+     * where there is no line-based input at all - just some input event advancing the page. */
+    suspend fun advance(): String {
+        when (entryMode) {
+            MODE_CAKE, MODE_BOSSKEY -> toggleCakeBosskey()
+            else -> handleEnter()
         }
+        return liveLine.value
+    }
+
+    /** [handlePaging]'s synchronous equivalent (Q21's own >[PAGE_SIZE]-choice pagination). */
+    suspend fun page(delta: Int): String {
+        handlePagingBody(delta)
+        return liveLine.value
     }
 
     fun onKeyEvent(key: String): Boolean {
@@ -146,16 +225,29 @@ class TerminalEngine {
         _liveLine.value = ""
     }
 
-    private fun handlePaging(delta: Int) {
+    private suspend fun handlePagingBody(delta: Int) {
         val choices = TerminalData.questions[qon - 1].choices
         if (choices.size <= PAGE_SIZE) return
         val next = (pageOffset + delta).coerceIn(0, choices.size - 1)
         if (next != pageOffset) {
             pageOffset = next
             isLocked = true
-            scope.launch {
-                clearScreen()
-                showQuestion()
+            clearScreen()
+            showQuestion()
+        }
+    }
+
+    private fun handlePaging(delta: Int) {
+        scope.launch { handlePagingBody(delta) }
+    }
+
+    /** Whole-line equivalent of the per-character filtering [onKeyEvent] applies as the user
+     * types - shared so [submitLine] accepts exactly the same characters as typing would. */
+    private fun setInputLine(line: String) {
+        input.clear()
+        for (c in line) {
+            if (isAcceptedChar(c) && input.length < MAX_INPUT_LENGTH) {
+                input.append(c.uppercaseChar())
             }
         }
     }
@@ -415,7 +507,7 @@ class TerminalEngine {
             MODE_BOSSKEY -> revealInstant(BOSSKEY_SPREADSHEET)
             MODE_CAKE -> {
                 reveal(CAKE_MONOLOGUE_1, 0, unlockAfter = false)
-                delay(2000) // stand-in for security02.flv playback
+                maybeDelay(2000) // stand-in for security02.flv playback
                 reveal(CAKE_MONOLOGUE_2, 0)
             }
             // Verbatim, matching the original's notesdisplay(): cjHistory's own text already
@@ -471,8 +563,20 @@ class TerminalEngine {
     private suspend fun farewell(errorMessage: String) {
         clearScreen()
         reveal("\n[$errorMessage]\n", GLADOS_SPEED)
-        delay(400)
+        maybeDelay(400)
         _exitRequested.value = true
+    }
+
+    /**
+     * Every real wall-clock suspension in this class - the typewriter effect in [reveal], and the
+     * cosmetic pauses in [farewell]/the cake monologue above - goes through here instead of
+     * calling `delay()` directly, so [instantReveal] hosts (a request/response session that must
+     * run a whole turn to completion synchronously, see the batch API below [boot]) get identical
+     * *content* with zero wall-clock cost, while [boot]/[onKeyEvent]-driven hosts (`ui-terminal`,
+     * `ui-web`) see exactly today's timing (`instantReveal` defaults to `false`).
+     */
+    private suspend fun maybeDelay(ms: Long) {
+        if (!instantReveal) delay(ms)
     }
 
     /**
@@ -511,7 +615,7 @@ class TerminalEngine {
                 for (ch in line) {
                     sb.append(ch)
                     _liveLine.value = base + sb
-                    delay(delayMs.toLong())
+                    maybeDelay(delayMs.toLong())
                 }
                 pageContent = base + sb
             } else {
@@ -561,17 +665,25 @@ class TerminalEngine {
     }
 
     companion object {
-        private const val MODE_LOGIN = 0
-        private const val MODE_SHELL = 1
-        private const val MODE_APPLICATION = 2
-        private const val MODE_BOSSKEY = 3
-        private const val MODE_CAKE = 4
-        private const val MODE_NOTES = 5
+        // Public (not private) so a stateless host driving the batch API can classify a restored
+        // EngineState.entryMode without duplicating these values - e.g. to tell whether the
+        // current page has a line-based input zone to submit to, or is a MODE_NOTES/CAKE/BOSSKEY
+        // "any key" page to call advance() on instead. Values are stable (mirror the original
+        // AS2's entryMode), so exposing them is a plain visibility widening, not a new contract.
+        const val MODE_LOGIN = 0
+        const val MODE_SHELL = 1
+        const val MODE_APPLICATION = 2
+        const val MODE_BOSSKEY = 3
+        const val MODE_CAKE = 4
+        const val MODE_NOTES = 5
 
         private const val GLADOS_SPEED = 7
         private const val NOTES_SPEED = 3
         private const val MAX_INPUT_LENGTH = 65
-        private const val PAGE_SIZE = 104
+
+        /** Q21's own >[PAGE_SIZE]-choice pagination page size (see [handlePagingBody]/[page]) -
+         * public so a stateless host knows what delta to pass to [page]. */
+        const val PAGE_SIZE = 104
 
         /**
          * Default [wrapWidth], matching the original's own pixel-width auto-wrap threshold.

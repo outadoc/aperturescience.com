@@ -12,6 +12,9 @@ allprojects {
     repositories {
         mavenCentral()
         google()
+        // outadoc/minipavi-kotlin (ui-minitel's Minitel/Vidéotex dependency) is only published
+        // via JitPack, not Maven Central.
+        maven { url = uri("https://jitpack.io") }
     }
 
     apply(plugin = "org.jlleitschuh.gradle.ktlint")
