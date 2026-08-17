@@ -39,12 +39,13 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
         // randomly synthesized, exactly like a fresh TerminalEngine() on the other two frontends -
         // NOT restored from MinitelSessionState.initial()'s placeholder.
         val engine = TerminalEngine(instantReveal = true)
+        engine.setViewportWidth(ScreenChunker.WRAP_WIDTH)
         engine.bootTurn()
         return render(engine, chunkIndex = 0)
     }
 
     val engine = TerminalEngine(instantReveal = true, initialState = state.toEngineState())
-    engine.setViewportWidth(ScreenChunker.COLUMNS)
+    engine.setViewportWidth(ScreenChunker.WRAP_WIDTH)
 
     val chunksBefore = ScreenChunker.chunk(engine.liveLine.value)
     val lastChunkIndex = chunksBefore.lastIndex
@@ -55,6 +56,11 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
     var chunkIndex = state.chunkIndex
     when {
         // Still more of the current turn's output to show - just scroll, no TerminalEngine call.
+        // Suite is the one consistent "more" key across every kind of page (Q21 pagination below
+        // uses it too), so a MODE_NOTES/CAKE/BOSSKEY page that spills past one screen (e.g.
+        // NOTES.EXE page 1) needs it as well, even though the original's "any key" MODE_NOTES
+        // semantics (see TerminalEngine.showNextPage's doc) only apply once a page is caught up
+        // with its own chunking - handled by the isAnyKeyMode branch further down.
         chunkIndex < lastChunkIndex && functionKey == FunctionKey.Suite -> {
             chunkIndex += 1
         }

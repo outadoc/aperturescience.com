@@ -93,7 +93,7 @@ data class MinitelSessionState(
                 uid = "",
                 pageContent = "",
                 input = "",
-                wrapWidth = ScreenChunker.COLUMNS,
+                wrapWidth = ScreenChunker.WRAP_WIDTH,
                 isLocked = true,
             )
     }

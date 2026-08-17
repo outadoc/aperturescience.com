@@ -11,9 +11,22 @@ package com.aperturescience.terminal.minitel
  * tall here.
  */
 object ScreenChunker {
-    /** Matches `VideotexBuilder.screenWidth` - also what this adapter passes to
-     * `TerminalEngine.setViewportWidth` so `reveal()`'s own word-wrap never exceeds it. */
+    /** Matches `VideotexBuilder.screenWidth` - the real physical column count, used for
+     * column/length math (input-zone position and length). NOT what gets passed to
+     * `TerminalEngine.setViewportWidth` - see [WRAP_WIDTH]. */
     const val COLUMNS = 40
+
+    /** What this adapter actually passes to `TerminalEngine.setViewportWidth`, one column short
+     * of [COLUMNS]. A Minitel auto-wraps as soon as a line fills all the way to column 40 -
+     * *in addition* to (not instead of) the explicit CRLF `render()` sends after every line - so a
+     * wrapped line exactly [COLUMNS] characters wide advances the cursor by two rows instead of
+     * one. That silently desyncs every row-count this adapter relies on: content further down
+     * the same chunk lands one row lower than expected (the tail can overdraw the status line at
+     * the top, wrapping past row 24), and an open input zone's computed `line` - based on how
+     * many rows the content is assumed to occupy - points one row too high. Wrapping one column
+     * short means no line ever reaches the edge, so the terminal never auto-wraps and our own
+     * CRLF stays the only thing moving the cursor down a row. */
+    const val WRAP_WIDTH = COLUMNS - 1
 
     /** Matches `VideotexBuilder.screenHeight - 1` (line 0 is the status line). */
     const val ROWS_PER_SCREEN = 24
