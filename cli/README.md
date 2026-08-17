@@ -12,7 +12,7 @@ and ported, and for the list of deliberate deviations from the original.
 
 ## Project structure
 
-Two Gradle modules:
+Four Gradle modules:
 
 - **`logic/`** — the whole state machine (`TerminalEngine`), with no
   dependency on Mosaic, Compose, or any other UI framework. Exposes a plain
@@ -22,6 +22,14 @@ Two Gradle modules:
   Collects the engine's `StateFlow` into a Compose `Text()` and forwards key
   events into it. This is the module with the `application`/shadow-jar setup
   and the `main()` entry point.
+- **`ui-web/`** — a browser/Compose-for-Web frontend (depends on `logic`).
+- **`ui-minitel/`** — a Minitel/Vidéotex frontend (depends on `logic`), built
+  on [minipavi-kotlin](https://github.com/outadoc/minipavi-kotlin). It's an
+  embedded Ktor server that speaks the [MiniPavi](https://www.minipavi.fr/)
+  gateway protocol: MiniPavi calls it once per user action and it renders one
+  Vidéotex frame in response. See [Running `ui-minitel`
+  locally](#running-ui-minitel-locally) below for how to exercise it with a
+  real (emulated) Minitel.
 
 ## Requirements
 
@@ -56,6 +64,35 @@ No real TTY needed — it runs in well under a second using
 pagination and a full 50-question run-through execute instantly. `ui-terminal`
 has no automated tests (Mosaic needs a real terminal); verify UI changes
 manually as described above.
+
+## Running `ui-minitel` locally
+
+`ui-minitel` doesn't talk Vidéotex over a serial line to a real Minitel — it
+speaks HTTP to a MiniPavi gateway, which is what actually terminates the
+Minitel/videotex protocol (over a real modem, or over the
+[websocket-based emulator](https://github.com/ludosevilla/minipavi/tree/master/emulminitel)
+used here). `ui-minitel/scripts/` sets up local instances of both, mirroring
+the [same setup in minipavi-kotlin](https://github.com/outadoc/minipavi-kotlin/tree/main/.docker):
+
+- **`minipavi`** — the PHP gateway server, exposing a websocket on `:8182`
+  and calling out to your locally-running `ui-minitel` over HTTP.
+- **`emulminitel`** — a web-based Minitel emulator, served on `:8082`, that
+  connects to `minipavi`'s websocket.
+
+To try it out:
+
+1. Start `ui-minitel` itself (it listens on `:8080`):
+   ```sh
+   ./gradlew :ui-minitel:jvmRun
+   ```
+2. In another terminal, build and start the gateway + emulator containers
+   with [Podman](https://podman.io/), and open the emulator in a browser tab
+   pointed at them:
+   ```sh
+   ui-minitel/scripts/start.sh
+   ```
+
+`ui-minitel/scripts/stop.sh` tears the containers back down.
 
 The program takes over the whole terminal on launch, like `vim` or `htop`
 (using the terminal's alternate-screen buffer) — whatever was on screen
