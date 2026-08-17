@@ -47,7 +47,7 @@ class TurnHandlerTest {
     /** NOTES page 1 spills past one screen - Suite reveals the rest, Envoi does nothing until
      * caught up, then advances like any accepted key. */
     @Test
-    fun `a NOTES-EXE page spanning multiple screens advances on Suite, then Envoi once caught up`() {
+    fun `a NOTES-EXE page spanning multiple screens advances on Suite - then Envoi once caught up`() {
         // "NOTES" typed at the shell prompt, submitted with Envoi.
         val page1Head = turn(adminShellState, FunctionKey.Envoi, userInput = listOf("NOTES"))
         assertEquals(MinitelMode.Notes(page = 1), page1Head.state.mode)

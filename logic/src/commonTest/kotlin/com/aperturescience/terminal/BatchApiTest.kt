@@ -13,7 +13,7 @@ import kotlin.test.assertTrue
  * matches the animated streaming path, and a session resumes cleanly via [TerminalEngine.captureState]. */
 class BatchApiTest {
     @Test
-    fun `bootTurn shows the bare login prompt, matching boot`() =
+    fun `bootTurn shows the bare login prompt - matching boot`() =
         runTest {
             val instant = TerminalEngine(instantReveal = true)
             assertEquals("> ", instant.bootTurn())
@@ -103,7 +103,7 @@ class BatchApiTest {
         }
 
     @Test
-    fun `page paginates question 21's choices and back, without touching the input line`() =
+    fun `page paginates question 21's choices and back without touching the input line`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)
             engine.bootTurn()
@@ -128,7 +128,7 @@ class BatchApiTest {
         }
 
     @Test
-    fun `submitLine sets exitRequested on LOGOUT, with the farewell message in the content`() =
+    fun `submitLine sets exitRequested on LOGOUT - with the farewell message in the content`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)
             engine.bootTurn()
