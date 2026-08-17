@@ -8,25 +8,12 @@ import fr.outadoc.minipavi.core.model.GatewayRequest
 import fr.outadoc.minipavi.core.model.ServiceResponse
 import fr.outadoc.minipavi.videotex.buildVideotex
 
-/**
- * Drives one MiniPavi gateway call to completion. See `TerminalEngine`'s "batch API" doc and
- * [ScreenChunker] for the two mismatches this bridges: minipavi-kotlin gives us one full,
- * already-validated line of input (or a bare function-key press) and expects exactly one
- * Vidéotex frame back, synchronously, with no wall-clock delay and nothing persisted in memory
- * between calls - everything survives in [MinitelSessionState], round-tripped through the
- * gateway.
- *
- * NOTE: this hasn't been exercised against a live MiniPavi gateway (no such environment was
- * reachable while writing it) - the `submitWith`/function-key wiring in particular is a
- * best-effort reading of minipavi-kotlin's model and worth validating for real before relying on
- * it.
- */
+/** Drives one MiniPavi gateway call to completion, bridging its one-line-in/one-frame-out model
+ * onto `TerminalEngine`'s turn API. Not yet exercised against a live gateway. */
 suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceResponse<MinitelSessionState> {
     val state = request.state
 
-    // Second half of the farewell sequence (see below): the previous turn already showed the
-    // farewell message and persisted this flag - now that the user pressed something, actually
-    // disconnect, without touching TerminalEngine at all.
+    // Farewell was already shown last turn - now disconnect without touching TerminalEngine.
     if (state.pendingDisconnect) {
         return ServiceResponse(
             state = state,
@@ -36,9 +23,7 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
     }
 
     if (request.event is GatewayRequest.Event.Connection) {
-        // A brand-new session: construct a genuinely fresh engine (no initialState) so `uid` is
-        // randomly synthesized, exactly like a fresh TerminalEngine() on the other two frontends -
-        // NOT restored from MinitelSessionState.initial()'s placeholder.
+        // Fresh engine so `uid` is randomly synthesized, not restored from the placeholder state.
         val engine = TerminalEngine(instantReveal = true)
         engine.setViewportWidth(ScreenChunker.WRAP_WIDTH)
         engine.bootTurn()
@@ -57,21 +42,15 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
 
     var chunkIndex = state.chunkIndex
     when {
-        // Still more of the current turn's output to show - just scroll, no TerminalEngine call.
-        // Suite is the one consistent "more" key across every kind of page (Q21 pagination below
-        // uses it too), so a MODE_NOTES/CAKE/BOSSKEY page that spills past one screen (e.g.
-        // NOTES.EXE page 1) needs it as well, even though the original's "any key" MODE_NOTES
-        // semantics (see TerminalEngine.showNextPage's doc) only apply once a page is caught up
-        // with its own chunking - handled by the isAnyKeyMode branch further down.
+        // More of the current turn's output to show - just scroll, no TerminalEngine call.
+        // Suite is the consistent "more" key everywhere, including Q21 pagination below.
         chunkIndex < lastChunkIndex && functionKey == FunctionKey.Suite -> {
             chunkIndex += 1
         }
         chunkIndex > 0 && functionKey == FunctionKey.Retour -> {
             chunkIndex -= 1
         }
-        // Correction/Annulation are handled by the gateway itself during line editing (never
-        // reach us meaningfully); Repetition/Guide/Sommaire have no TerminalEngine equivalent -
-        // all of them just redisplay the current chunk unchanged.
+        // Correction/Annulation/Repetition/Guide/Sommaire: no TerminalEngine equivalent, just redisplay.
         functionKey == FunctionKey.Repetition ||
             functionKey == FunctionKey.Guide ||
             functionKey == FunctionKey.Sommaire ||
@@ -101,10 +80,7 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
     }
 
     if (engine.exitRequested.value) {
-        // The farewell text is already in engine.liveLine - show it as a normal page this turn,
-        // but don't disconnect yet: wait for the user's next keypress (handled at the top of this
-        // function via pendingDisconnect), matching how ui-terminal/ui-web show a final message
-        // before ending the session rather than cutting it off mid-sentence.
+        // Show the farewell text this turn, disconnect on the next keypress (pendingDisconnect above).
         return render(engine, chunkIndex = 0, pendingDisconnect = true)
     }
 

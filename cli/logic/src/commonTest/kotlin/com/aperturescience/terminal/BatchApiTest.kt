@@ -9,15 +9,8 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-/**
- * Covers the synchronous "batch" API (`instantReveal = true` + [TerminalEngine.bootTurn]/
- * [TerminalEngine.submitLine]/[TerminalEngine.advance]/[TerminalEngine.page]) added for stateless
- * hosts like a request/response Minitel service - see `EngineState`/`captureState()`. Two things
- * this file specifically has to demonstrate, since nothing else does: (1) skipping the typewriter
- * delay produces byte-identical *content* to the animated streaming path, and (2) a session can be
- * paused via [TerminalEngine.captureState] and resumed on a brand-new instance with no observable
- * difference from never having been interrupted.
- */
+/** Covers the synchronous "batch" API (`instantReveal = true`) for stateless hosts: content
+ * matches the animated streaming path, and a session resumes cleanly via [TerminalEngine.captureState]. */
 class BatchApiTest {
     @Test
     fun `bootTurn shows the bare login prompt, matching boot`() =

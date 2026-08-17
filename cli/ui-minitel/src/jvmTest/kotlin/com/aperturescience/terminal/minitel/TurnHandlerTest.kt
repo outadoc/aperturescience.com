@@ -44,11 +44,8 @@ class TurnHandlerTest {
             )
         }
 
-    /** NOTES.EXE's first history page is long enough to spill past one 24-line Minitel screen (27
-     * wrapped lines) - Suite is the consistent "more of this screen" key everywhere (same as Q21
-     * pagination), so it must reveal the rest of the page; Envoi has no effect until the page is
-     * fully caught up, at which point it (like any accepted key) moves on to the next NOTES
-     * page. */
+    /** NOTES page 1 spills past one screen - Suite reveals the rest, Envoi does nothing until
+     * caught up, then advances like any accepted key. */
     @Test
     fun `a NOTES-EXE page spanning multiple screens advances on Suite, then Envoi once caught up`() {
         // "NOTES" typed at the shell prompt, submitted with Envoi.
@@ -73,9 +70,7 @@ class TurnHandlerTest {
         assertEquals(0, page2Head.state.chunkIndex)
     }
 
-    /** All four NOTES.EXE pages wrap to two screens each at [ScreenChunker.WRAP_WIDTH] - walks
-     * all the way through (Suite for the extra screen, Envoi for the actual page turn), landing
-     * back on the admin shell once page 4 (the one ending in "[END]") is fully read. */
+    /** Walks all four two-screen NOTES pages (Suite then Envoi each), landing back on the shell. */
     @Test
     fun `paging through every NOTES-EXE page returns to the shell afterwards`() {
         var response = turn(adminShellState, FunctionKey.Envoi, userInput = listOf("NOTES")) // page 1, chunk 0
@@ -91,14 +86,8 @@ class TurnHandlerTest {
         assertEquals(MinitelMode.Shell(), backToShell.state.mode)
     }
 
-    /** Regression test for a related word-wrap bug: a wrapped line exactly [ScreenChunker.COLUMNS]
-     * characters wide fills the Minitel's row completely, so the terminal auto-wraps to the next
-     * row on its own - and then `render()`'s own explicit CRLF after every line advances the
-     * cursor a *second* time, one row further than this adapter's row-counting expects. That
-     * showed up as the admin shell's input zone (positioned using the assumed row count) landing
-     * one row above the "ADMIN>" prompt it belongs on, because the header
-     * ("GLaDOS v1.07a (c) 1982 Aperture Science, Inc.") happens to wrap with a first line exactly
-     * 40 characters wide at the old [ScreenChunker.COLUMNS]-width wrap. */
+    /** Regression test: a full-width wrapped line used to double-advance the cursor, landing the
+     * input zone one row above "ADMIN>" instead of on it. */
     @Test
     fun `the admin shell input zone lines up with the ADMIN prompt it's shown on`() {
         val connected =
@@ -122,9 +111,7 @@ class TurnHandlerTest {
 
         val command = shellPrompt.command
         check(command is ServiceResponse.Command.InputText)
-        // "GLaDOS v1.07a (c) 1982 Aperture Science, Inc." wraps to 2 lines at WRAP_WIDTH (neither
-        // reaching the full 40-column width), followed by a blank line and "ADMIN> " - 4 physical
-        // rows total, with the input zone on that same 4th row, right after the prompt text.
+        // Header wraps to 2 lines + a blank line + "ADMIN> " = row 4, where the input zone belongs.
         assertEquals(4, command.line)
     }
 }

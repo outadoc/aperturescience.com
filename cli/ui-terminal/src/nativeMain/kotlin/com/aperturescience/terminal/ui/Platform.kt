@@ -9,17 +9,11 @@ import platform.posix.exit
 import platform.posix.fflush
 import platform.posix.signal
 
-// staticCFunction bodies can't capture local state, only top-level/global vars - so the action
-// passed to installTerminationHandler is stashed here and invoked from a plain top-level
-// reference to it.
+// staticCFunction bodies can't capture local state, so the action is stashed here instead.
 private var terminationAction: (() -> Unit)? = null
 
-// atexit alone covers a normal return from main() (the C runtime always runs atexit handlers
-// then), but not SIGTERM/SIGHUP delivered from outside the process (closing the terminal window,
-// `kill <pid>`) - those terminate the process without ever reaching atexit unless something
-// catches the signal and calls exit() itself, which is what the signal() handler below does. This
-// mirrors the JVM actual: a shutdown hook there is likewise run for both normal exit and external
-// signals, by the JVM itself.
+// atexit alone covers a normal return from main(), not external SIGTERM/SIGHUP - those need their
+// own signal() handler to call exit() (which then runs the atexit handlers).
 @OptIn(ExperimentalForeignApi::class)
 actual fun installTerminationHandler(action: () -> Unit) {
     terminationAction = action

@@ -3,11 +3,8 @@ package com.aperturescience.terminal
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 
-/*
- * Test-only driver helpers for TerminalEngine. All of these advance virtual time to
- * completion after every simulated keystroke, so callers never need real-time waits for the
- * engine's typewriter animations (reveal()'s delay() calls) - see TestScope/runTest.
- */
+// Test-only driver helpers for TerminalEngine - each advances virtual time so callers never
+// need real-time waits for the typewriter animation.
 
 /** Sends a single raw key (as [TerminalEngine.onKeyEvent] expects it) and settles. */
 fun TestScope.pressKey(
@@ -18,10 +15,8 @@ fun TestScope.pressKey(
     advanceUntilIdle()
 }
 
-/**
- * Types [text] one character at a time (matching how a real keyboard feeds
- * [TerminalEngine.onKeyEvent]), then presses Enter, then settles.
- */
+/** Types [text] one character at a time via [TerminalEngine.onKeyEvent], then presses Enter and
+ * settles. */
 fun TestScope.submit(
     engine: TerminalEngine,
     text: String,

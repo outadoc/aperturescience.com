@@ -158,10 +158,7 @@ class ShellCommandsTest {
     @Test
     fun `a period cannot be typed at all - so NOTES-EXE degrades to NOTESEXE`() =
         runTest {
-            // "." isn't in the accepted-character set (faithfully matching the original, which also
-            // has no period key in its keyCode allowlist) - so "NOTES.EXE" can never actually be
-            // typed via the simulated keyboard; the period is silently dropped and what actually
-            // gets submitted is "NOTESEXE", an unrecognized command.
+            // "." isn't an accepted character, so "NOTES.EXE" submits as "NOTESEXE" instead.
             val engine = loginToShell()
             submit(engine, "NOTES.EXE")
             assertTrue(engine.liveLine.value.contains("ERROR 24 [File 'NOTESEXE' not found]"))

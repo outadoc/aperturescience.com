@@ -3,15 +3,8 @@ package com.aperturescience.terminal.minitel
 import com.aperturescience.terminal.EngineState
 import kotlinx.serialization.Serializable
 
-/**
- * The `TState` minipavi-kotlin's `minitelService<MinitelSessionState>(...)` round-trips through
- * the MiniPavi gateway on every call - the only place in this module that touches
- * `kotlinx.serialization`, mirroring [EngineState] field-for-field (see [MinitelMode] for how
- * [EngineState.mode] is mirrored specifically) plus two fields with no `EngineState` equivalent:
- * [chunkIndex] (this adapter's own screen-height pagination cursor within the last turn's output,
- * see [ScreenChunker]) and [pendingDisconnect] (farewell shown, waiting for the next keypress to
- * actually disconnect - see [TurnHandler]).
- */
+/** The `TState` MiniPavi round-trips every call. Mirrors [EngineState] field-for-field, plus
+ * [chunkIndex] (see [ScreenChunker]) and [pendingDisconnect] (see [TurnHandler]). */
 @Serializable
 data class MinitelSessionState(
     val mode: MinitelMode,
@@ -55,14 +48,8 @@ data class MinitelSessionState(
                 )
             }
 
-        /**
-         * Placeholder state for `minitelService`'s `initialState` parameter. Never actually
-         * rendered: [TurnHandler] special-cases `GatewayRequest.Event.Connection` (every brand
-         * new Minitel session) to construct a fresh `TerminalEngine(instantReveal = true)` with
-         * no `initialState` at all, so `uid` is genuinely randomly synthesized rather than
-         * picking up this placeholder's empty one - see `TerminalEngine`'s
-         * `instantReveal`/`initialState` constructor doc.
-         */
+        /** Placeholder for `minitelService`'s `initialState` param - never actually rendered,
+         * since [TurnHandler] builds a fresh `TerminalEngine` for every new session instead. */
         fun initial(): MinitelSessionState =
             MinitelSessionState(
                 mode = MinitelMode.Login.Initial,

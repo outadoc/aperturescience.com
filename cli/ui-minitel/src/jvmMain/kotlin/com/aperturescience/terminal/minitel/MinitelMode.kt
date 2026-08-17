@@ -4,13 +4,8 @@ import com.aperturescience.terminal.Mode
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/**
- * The data-layer mirror of `logic`'s [Mode] - `Mode` is deliberately not `@Serializable` (see
- * its doc), so this module, the one place that actually needs to round-trip state through the
- * MiniPavi gateway between calls (see [MinitelSessionState]), defines its own serializable copy
- * and converts at the boundary via [toDomain]/[toData]. Each case has an explicit [SerialName] so
- * the wire format stays stable even if [Mode]'s or [MinitelMode]'s own case names change later.
- */
+/** Serializable mirror of `logic`'s [Mode] (not `@Serializable` itself) - converts via
+ * [toDomain]/[toData]; each case has an explicit [SerialName] to keep the wire format stable. */
 @Serializable
 sealed interface MinitelMode {
     @Serializable

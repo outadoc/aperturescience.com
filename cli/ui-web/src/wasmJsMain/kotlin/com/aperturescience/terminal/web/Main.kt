@@ -12,13 +12,8 @@ import org.w3c.dom.HTMLPreElement
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
 
-/**
- * Web counterpart to `ui-terminal`'s `App.kt`/`AppRunner.kt`: Mosaic has no Kotlin/Wasm target,
- * so there's no shared UI layer between the CLI and the browser - this drives [TerminalEngine]
- * directly against the DOM instead. [TerminalEngine] itself needed zero changes to run here: it
- * was already UI-agnostic (`liveLine`/`exitRequested` are plain `StateFlow`s, `onKeyEvent` takes
- * a plain key name), the same contract `App.kt` binds to Mosaic's `Text()`/`onKeyEvent` with.
- */
+/** Web counterpart to `ui-terminal`'s `App.kt`/`AppRunner.kt`: no shared UI layer (Mosaic has no
+ * Wasm target), so this drives [TerminalEngine] directly against the DOM instead. */
 fun main() {
     val engine = TerminalEngine()
     val scope = CoroutineScope(Job())
@@ -29,33 +24,19 @@ fun main() {
         engine.liveLine.collectLatest { screen.textContent = it }
     }
 
-    // Mirrors farewell()'s effect in the CLI (process exit): there's no process to exit here, so
-    // this just stops the terminal from reacting to further keystrokes once LOGOUT/PLAY PORTAL
-    // ends the session - the final message reveal() already wrote is left on screen.
+    // No process to exit here - just stop reacting to keystrokes once the session ends.
     var acceptingInput = true
     scope.launch {
         engine.exitRequested.first { it }
         acceptingInput = false
     }
 
-    // Suppresses TerminalEngine's own hard-wrapping entirely (see setViewportWidth's doc): there
-    // is no Mosaic-style redraw-desync risk here to guard against in the first place (this
-    // renders by replacing textContent wholesale, no cursor/diffing involved), so the only job
-    // left for reveal()'s wordWrap is picking *where* long lines break - a job CSS's own
-    // `white-space: pre-wrap` (styles.css) already does correctly and, unlike a fixed character
-    // count, responsively as the window resizes. Running both at once was tried first and looked
-    // broken even when nominally "agreeing" (both around 100 characters): TerminalEngine's own
-    // wordWrap uses a hardcoded character count with no knowledge of the actual rendered font
-    // metrics or available width, so its break points don't move as the window resizes and can
-    // land well short of - or occasionally past - where the real text would naturally wrap,
-    // which reads as randomly-short, "already hard-wrapped" lines. Letting exactly one layer (the
-    // browser's) own all wrapping decisions is what actually fixes that, not tuning the number.
+    // No hard-wrapping needed - CSS's `white-space: pre-wrap` handles it, and unlike a fixed
+    // character count, responds to window resizes.
     engine.setViewportWidth(UNWRAPPED_WIDTH)
 
-    // Explicitly-typed (Event) -> Unit value, not an inline lambda literal, to sidestep overload
-    // ambiguity between addEventListener's `EventListener` (SAM-convertible external interface)
-    // and `(Event) -> Unit` overloads - a bare lambda literal argument is ambiguous between the
-    // two, a value with an already-resolved static type isn't.
+    // Explicitly-typed value, not an inline lambda, to sidestep overload ambiguity between
+    // addEventListener's EventListener and (Event) -> Unit overloads.
     val onKeyDown: (Event) -> Unit = { event ->
         if (acceptingInput) handleKeyDown(event as KeyboardEvent, engine)
     }
@@ -66,20 +47,13 @@ fun main() {
 
 private const val TERMINAL_ELEMENT_ID = "terminal"
 
-// Larger than any real line TerminalData contains, which is all TerminalEngine.wordWrap needs to
-// never trigger - see the comment at the setViewportWidth() call site for why "unwrapped" (CSS
-// does it instead) rather than some other specific number.
+// Larger than any real line - just enough to keep TerminalEngine.wordWrap from ever triggering.
 private const val UNWRAPPED_WIDTH = Int.MAX_VALUE
 
 private val NAMED_KEYS = setOf("Enter", "Backspace", "PageUp", "PageDown")
 
-/**
- * Forwards plain keystrokes to [TerminalEngine.onKeyEvent], mirroring `App.kt`'s `onKeyEvent`
- * modifier. Ctrl/Cmd/Alt combos are deliberately left alone (not forwarded, not prevented) so
- * browser/OS shortcuts - copy, devtools, tab switching, refresh - keep working; that's this
- * frontend's equivalent of `App.kt` returning `false` (unhandled) for Ctrl+C so Mosaic's own
- * root-level handling takes over instead of the key being swallowed as text input.
- */
+/** Forwards plain keystrokes to [TerminalEngine.onKeyEvent]. Ctrl/Cmd/Alt combos are left alone
+ * so browser/OS shortcuts (copy, devtools, refresh) keep working. */
 private fun handleKeyDown(
     event: KeyboardEvent,
     engine: TerminalEngine,
