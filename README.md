@@ -83,7 +83,7 @@ To try it out:
 
 1. Start `ui-minitel` itself (it listens on `:8080`):
    ```sh
-   ./gradlew :ui-minitel:jvmRun
+   ./gradlew :ui-minitel:run
    ```
 2. In another terminal, build and start the gateway + emulator containers
    with [Podman](https://podman.io/), and open the emulator in a browser tab

@@ -27,7 +27,13 @@ minipavi-videotex = { module = "com.github.outadoc.minipavi-kotlin:videotex", ve
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+# ui-minitel only ever targeted the JVM - plain kotlin("jvm") instead of the multiplatform plugin
+# so the `application` plugin (needed by the ktor plugin's Docker/Jib support below) applies.
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-plugin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-plugin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
+# Same version as the ktor library dependencies above - provides ui-minitel's Docker image tasks
+# (buildImage/publishImage/runDocker), see https://ktor.io/docs/docker.html.
+ktor = { id = "io.ktor.plugin", version.ref = "ktor" }
