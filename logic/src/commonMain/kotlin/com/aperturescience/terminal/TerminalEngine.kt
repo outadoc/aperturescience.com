@@ -607,9 +607,10 @@ class TerminalEngine(
                 (key.length == 1 && isAcceptedChar(key[0]))
 
         private fun synthesizeUid(): String {
-            val chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            // 64 chars, matching the "64 digit UIN(+L)" prompt text and the original site.
+            val chars = "0123456789abcdefghijklmnopqrstuvwxyz"
             return buildString {
-                repeat(12) { append(chars[Random.nextInt(chars.length)]) }
+                repeat(64) { append(chars[Random.nextInt(chars.length)]) }
             }
         }
 
