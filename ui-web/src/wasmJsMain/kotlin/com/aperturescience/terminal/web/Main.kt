@@ -1,13 +1,15 @@
 package com.aperturescience.terminal.web
 
 import com.aperturescience.terminal.BLINK_TAG
+import com.aperturescience.terminal.Intent
+import com.aperturescience.terminal.NAMED_KEYS
 import com.aperturescience.terminal.TerminalEngine
+import com.aperturescience.terminal.displayText
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLPreElement
@@ -25,31 +27,31 @@ fun main() {
     val screen = document.getElementById(TERMINAL_ELEMENT_ID) as HTMLPreElement
 
     scope.launch {
-        combine(engine.liveLine, engine.annotations, ::Pair).collectLatest { (line, annotations) ->
-            val blinkRange = annotations.firstOrNull { it.tag == BLINK_TAG }?.range
-            renderScreen(screen, line, blinkRange)
+        engine.state.collectLatest { state ->
+            val blinkRange = state.annotations.firstOrNull { it.tag == BLINK_TAG }?.range
+            renderScreen(screen, state.displayText, blinkRange)
         }
     }
 
     // No process to exit here - just stop reacting to keystrokes once the session ends.
     var acceptingInput = true
     scope.launch {
-        engine.exitRequested.first { it }
+        engine.state.first { it.exitRequested }
         acceptingInput = false
     }
 
     // No hard-wrapping needed - CSS's `white-space: pre-wrap` handles it, and unlike a fixed
     // character count, responds to window resizes.
-    engine.setViewportWidth(UNWRAPPED_WIDTH)
+    scope.launch { engine.dispatch(Intent.ViewportResized(UNWRAPPED_WIDTH)) }
 
     // Explicitly-typed value, not an inline lambda, to sidestep overload ambiguity between
     // addEventListener's EventListener and (Event) -> Unit overloads.
     val onKeyDown: (Event) -> Unit = { event ->
-        if (acceptingInput) handleKeyDown(event as KeyboardEvent, engine)
+        if (acceptingInput) handleKeyDown(event as KeyboardEvent, engine, scope)
     }
     window.addEventListener("keydown", onKeyDown)
 
-    engine.boot(scope)
+    scope.launch { engine.dispatch(Intent.Boot) }
 }
 
 /**
@@ -79,27 +81,23 @@ private fun renderScreen(
 private const val TERMINAL_ELEMENT_ID = "terminal"
 
 /**
- * Larger than any real line - just enough to keep `TerminalEngine.wordWrap` from ever triggering.
+ * Larger than any real line - just enough to keep word-wrapping from ever triggering.
  */
 private const val UNWRAPPED_WIDTH = Int.MAX_VALUE
 
 /**
- * Shares [TerminalEngine]'s own list instead of a separately-maintained copy, so this can't drift.
- */
-private val NAMED_KEYS = TerminalEngine.NAMED_KEYS
-
-/**
- * Forwards plain keystrokes to [TerminalEngine.onKeyEvent]. Ctrl/Cmd/Alt combos are left alone
- * so browser/OS shortcuts (copy, devtools, refresh) keep working.
+ * Forwards plain keystrokes to [TerminalEngine.dispatch] as [Intent.KeyPressed]. Ctrl/Cmd/Alt
+ * combos are left alone so browser/OS shortcuts (copy, devtools, refresh) keep working.
  */
 private fun handleKeyDown(
     event: KeyboardEvent,
     engine: TerminalEngine,
+    scope: CoroutineScope,
 ) {
     if (event.ctrlKey || event.metaKey || event.altKey) return
     val key = event.key
     if (key in NAMED_KEYS || key.length == 1) {
         event.preventDefault()
-        engine.onKeyEvent(key)
+        scope.launch { engine.dispatch(Intent.KeyPressed(key)) }
     }
 }

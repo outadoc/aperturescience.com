@@ -12,7 +12,7 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "DIR")
-            val output = engine.liveLine.value
+            val output = engine.state.value.displayText
             assertTrue(output.contains("DISK VOLUME 255 [NEW EMPLOYEE WORKSTATION]"))
             assertTrue(output.contains("APPLY.EXE"))
             assertTrue(output.contains("1 FILE(S) IN 19 BLOCKS"))
@@ -24,7 +24,7 @@ class ShellCommandsTest {
         runTest {
             val engine = loginAsAdmin()
             submit(engine, "DIR")
-            val output = engine.liveLine.value
+            val output = engine.state.value.displayText
             assertTrue(output.contains("DISK VOLUME 255 [WORKSTATION CJOHNSON]"))
             assertTrue(output.contains("APPLY.EXE"))
             assertTrue(output.contains("NOTES.EXE"))
@@ -40,7 +40,7 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "DIR")
-            val output = engine.liveLine.value
+            val output = engine.state.value.displayText
             assertTrue(output.contains("Inc.\n\nDISK VOLUME 255 [NEW EMPLOYEE WORKSTATION]"))
             assertTrue(output.contains("1 FILE(S) IN 19 BLOCKS\n\n"))
         }
@@ -52,8 +52,9 @@ class ShellCommandsTest {
                 val engine = loginToShell()
                 submit(engine, alias)
                 assertTrue(
-                    engine.liveLine.value.contains("APPLY.EXE"),
-                    "expected DIR-like output for '$alias', got: ${engine.liveLine.value}",
+                    engine.state.value.displayText
+                        .contains("APPLY.EXE"),
+                    "expected DIR-like output for '$alias', got: ${engine.state.value.displayText}",
                 )
             }
         }
@@ -63,7 +64,10 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "IP")
-            assertTrue(engine.liveLine.value.contains("uid:"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("uid:"),
+            )
         }
 
     @Test
@@ -71,7 +75,7 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "HELP")
-            val output = engine.liveLine.value
+            val output = engine.state.value.displayText
             assertTrue(output.contains("APPEND"))
             assertTrue(output.contains("TAPEDISK"))
             assertFalse(output.contains("NOTES"))
@@ -84,8 +88,9 @@ class ShellCommandsTest {
                 val engine = loginAsAdmin()
                 submit(engine, alias)
                 assertTrue(
-                    engine.liveLine.value.contains("NOTES"),
-                    "expected NOTES in admin help output for '$alias', got: ${engine.liveLine.value}",
+                    engine.state.value.displayText
+                        .contains("NOTES"),
+                    "expected NOTES in admin help output for '$alias', got: ${engine.state.value.displayText}",
                 )
             }
         }
@@ -95,7 +100,10 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "FOOBAR")
-            assertTrue(engine.liveLine.value.contains("ERROR 24 [File 'FOOBAR' not found]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 24 [File 'FOOBAR' not found]"),
+            )
         }
 
     @Test
@@ -105,8 +113,9 @@ class ShellCommandsTest {
                 val engine = loginToShell()
                 submit(engine, cmd)
                 assertTrue(
-                    engine.liveLine.value.contains("ERROR 15 [Disk is write protected]"),
-                    "expected write-protected error for '$cmd', got: ${engine.liveLine.value}",
+                    engine.state.value.displayText
+                        .contains("ERROR 15 [Disk is write protected]"),
+                    "expected write-protected error for '$cmd', got: ${engine.state.value.displayText}",
                 )
             }
         }
@@ -116,7 +125,10 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "PLAY")
-            assertTrue(engine.liveLine.value.contains("ERROR 03 [What would you like to play?]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 03 [What would you like to play?]"),
+            )
         }
 
     @Test
@@ -124,9 +136,15 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "PLAY CHESS")
-            assertFalse(engine.liveLine.value.contains("ERROR"))
-            assertTrue(engine.liveLine.value.contains("B:\\>"))
-            assertFalse(engine.exitRequested.value)
+            assertFalse(
+                engine.state.value.displayText
+                    .contains("ERROR"),
+            )
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("B:\\>"),
+            )
+            assertFalse(engine.state.value.exitRequested)
         }
 
     @Test
@@ -134,7 +152,10 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "INTERROGATE")
-            assertTrue(engine.liveLine.value.contains("ERROR 02 [Command requires at least one parameter]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 02 [Command requires at least one parameter]"),
+            )
         }
 
     @Test
@@ -142,7 +163,10 @@ class ShellCommandsTest {
         runTest {
             val engine = loginAsAdmin()
             submit(engine, "INTERROGATE SOMEONE")
-            assertTrue(engine.liveLine.value.contains("ERROR 07 [Unknown Employee]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 07 [Unknown Employee]"),
+            )
         }
 
     @Test
@@ -150,7 +174,10 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "INTERROGATE SOMEONE")
-            assertTrue(engine.liveLine.value.contains("ERROR 01 [Illegal attempt to initiate disciplinary action]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 01 [Illegal attempt to initiate disciplinary action]"),
+            )
         }
 
     @Test
@@ -158,7 +185,10 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "TAPEDISK")
-            assertTrue(engine.liveLine.value.contains("ERROR 18 [User not authorized to transfer system tapes]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 18 [User not authorized to transfer system tapes]"),
+            )
         }
 
     @Test
@@ -166,7 +196,10 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "NOTES")
-            assertTrue(engine.liveLine.value.contains("ERROR 24 [File 'NOTES' not found]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 24 [File 'NOTES' not found]"),
+            )
         }
 
     @Test
@@ -175,7 +208,10 @@ class ShellCommandsTest {
             // "." isn't an accepted character, so "NOTES.EXE" submits as "NOTESEXE" instead.
             val engine = loginToShell()
             submit(engine, "NOTES.EXE")
-            assertTrue(engine.liveLine.value.contains("ERROR 24 [File 'NOTESEXE' not found]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 24 [File 'NOTESEXE' not found]"),
+            )
         }
 
     @Test
@@ -183,16 +219,19 @@ class ShellCommandsTest {
         runTest {
             val engine = loginAsAdmin()
             submit(engine, "NOTES")
-            assertTrue(engine.liveLine.value.contains("1953"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("1953"),
+            )
         }
 
     @Test
     fun `blank input does nothing at all`() =
         runTest {
             val engine = loginToShell()
-            val before = engine.liveLine.value
+            val before = engine.state.value.displayText
             pressKey(engine, "Enter")
-            assertEquals(before, engine.liveLine.value)
+            assertEquals(before, engine.state.value.displayText)
         }
 
     @Test
@@ -200,7 +239,10 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "APPLY")
-            assertTrue(engine.liveLine.value.contains("ENRICHMENT CENTER TEST SUBJECT APPLICATION"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ENRICHMENT CENTER TEST SUBJECT APPLICATION"),
+            )
         }
 
     @Test
@@ -209,7 +251,10 @@ class ShellCommandsTest {
             // Same period-is-unreachable quirk as NOTES.EXE - "APPLY.EXE" can never actually be typed.
             val engine = loginToShell()
             submit(engine, "APPLY.EXE")
-            assertTrue(engine.liveLine.value.contains("ERROR 24 [File 'APPLYEXE' not found]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 24 [File 'APPLYEXE' not found]"),
+            )
         }
 
     @Test
@@ -218,8 +263,11 @@ class ShellCommandsTest {
             for (cmd in listOf("LOGOUT", "BYE", "LOGOFF", "VALVE")) {
                 val engine = loginToShell()
                 submit(engine, cmd)
-                assertTrue(engine.exitRequested.value, "expected exitRequested after '$cmd'")
-                assertTrue(engine.liveLine.value.contains("[ERROR: STORE NOT FOUND]"))
+                assertTrue(engine.state.value.exitRequested, "expected exitRequested after '$cmd'")
+                assertTrue(
+                    engine.state.value.displayText
+                        .contains("[ERROR: STORE NOT FOUND]"),
+                )
             }
         }
 
@@ -228,8 +276,11 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "PLAY PORTAL")
-            assertTrue(engine.exitRequested.value)
-            assertTrue(engine.liveLine.value.contains("[ERROR: TRAILER NOT FOUND]"))
+            assertTrue(engine.state.value.exitRequested)
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("[ERROR: TRAILER NOT FOUND]"),
+            )
         }
 
     @Test
@@ -237,6 +288,9 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "THECAKEISALIE")
-            assertTrue(engine.liveLine.value.contains("left the building"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("left the building"),
+            )
         }
 }

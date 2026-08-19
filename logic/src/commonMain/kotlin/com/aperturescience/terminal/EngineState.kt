@@ -13,4 +13,14 @@ data class EngineState(
     val wrapWidth: Int,
     val isLocked: Boolean,
     val annotations: List<TextAnnotation> = emptyList(),
+    /**
+     * Set true once the session should end (LOGOUT/PLAY PORTAL) - was a separate
+     * `exitRequested` StateFlow; now just another field, since `state` is the only StateFlow.
+     */
+    val exitRequested: Boolean = false,
+    /**
+     * Reducer-only bookkeeping: the not-yet-closed blink annotation's start offset mid-reveal.
+     * Always `null` between turns.
+     */
+    val pendingAnnotationStart: Int? = null,
 )

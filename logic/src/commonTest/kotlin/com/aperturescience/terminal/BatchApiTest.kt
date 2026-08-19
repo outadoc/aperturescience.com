@@ -10,194 +10,218 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 /**
- * Covers the synchronous "batch" API (`instantReveal = true`) for stateless hosts: content
- * matches the animated streaming path, and a session resumes cleanly via [TerminalEngine.captureState].
+ * Covers `instantReveal = true` for stateless hosts: `dispatch` resolves without suspending,
+ * and a session resumes cleanly via [TerminalEngine.state].
  */
 class BatchApiTest {
     @Test
-    fun `bootTurn shows the bare login prompt - matching boot`() =
+    fun `Boot shows the bare login prompt - matching the animated path`() =
         runTest {
             val instant = TerminalEngine(instantReveal = true)
-            assertEquals("> ", instant.bootTurn())
+            instant.dispatch(Intent.Boot)
+            assertEquals("> ", instant.state.value.displayText)
         }
 
     @Test
-    fun `submitLine drives login through to the shell prompt`() =
+    fun `LineSubmitted drives login through to the shell prompt`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)
-            engine.bootTurn()
-            engine.submitLine("LOGON")
-            engine.submitLine("TESTER")
-            val result = engine.submitLine("PORTAL")
+            engine.dispatch(Intent.Boot)
+            engine.dispatch(Intent.LineSubmitted("LOGON"))
+            engine.dispatch(Intent.LineSubmitted("TESTER"))
+            engine.dispatch(Intent.LineSubmitted("PORTAL"))
+            val result = engine.state.value.displayText
 
             assertTrue(result.contains("B:\\>"))
             assertTrue(result.contains("GLaDOS v1.07 "))
         }
 
     @Test
-    fun `submitLine rejects invalid input just like onKeyEvent does`() =
+    fun `LineSubmitted rejects invalid input just like KeyPressed does`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)
-            engine.bootTurn()
-            engine.submitLine("LOGON")
-            val result = engine.submitLine("AB") // too short, must be rejected and redisplayed
+            engine.dispatch(Intent.Boot)
+            engine.dispatch(Intent.LineSubmitted("LOGON"))
+            engine.dispatch(Intent.LineSubmitted("AB")) // too short, must be rejected and redisplayed
+            val result = engine.state.value.displayText
 
             assertTrue(result.contains("Username>"))
             assertFalse(result.contains("Password>"))
         }
 
     @Test
-    fun `submitLine content matches the streaming path exactly for the same inputs`() =
+    fun `LineSubmitted content matches the streaming path exactly for the same inputs`() =
         runTest {
             val fixedUid = "FIXEDUID0001"
-            val streamingState = TerminalEngine().captureState().copy(uid = fixedUid)
-            val instantState = TerminalEngine(instantReveal = true).captureState().copy(uid = fixedUid)
+            val streamingState = TerminalEngine().state.value.copy(uid = fixedUid)
+            val instantState = TerminalEngine(instantReveal = true).state.value.copy(uid = fixedUid)
 
             val streaming = loginToShell(TerminalEngine(initialState = streamingState))
 
             val instant = TerminalEngine(instantReveal = true, initialState = instantState)
-            instant.bootTurn()
-            instant.submitLine("LOGON")
-            instant.submitLine("TESTER")
-            val instantResult = instant.submitLine("PORTAL")
+            instant.dispatch(Intent.Boot)
+            instant.dispatch(Intent.LineSubmitted("LOGON"))
+            instant.dispatch(Intent.LineSubmitted("TESTER"))
+            instant.dispatch(Intent.LineSubmitted("PORTAL"))
 
-            assertEquals(streaming.liveLine.value, instantResult)
+            assertEquals(streaming.state.value.displayText, instant.state.value.displayText)
         }
 
     @Test
-    fun `advance toggles the cake-bosskey loop just like onKeyEvent does`() =
+    fun `Advanced toggles the cake-bosskey loop just like KeyPressed does`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)
-            engine.bootTurn()
-            engine.submitLine("LOGON")
-            engine.submitLine("TESTER")
-            engine.submitLine("PORTAL")
-            val cakeScreen = engine.submitLine("THECAKEISALIE")
+            engine.dispatch(Intent.Boot)
+            engine.dispatch(Intent.LineSubmitted("LOGON"))
+            engine.dispatch(Intent.LineSubmitted("TESTER"))
+            engine.dispatch(Intent.LineSubmitted("PORTAL"))
+            engine.dispatch(Intent.LineSubmitted("THECAKEISALIE"))
+            val cakeScreen = engine.state.value.displayText
             assertTrue(cakeScreen.contains("left the building"))
 
-            val bosskeyScreen = engine.advance()
+            engine.dispatch(Intent.Advanced)
+            val bosskeyScreen = engine.state.value.displayText
             assertNotEquals(cakeScreen, bosskeyScreen)
             assertTrue(bosskeyScreen.contains("TOTAL"))
 
-            val backToCake = engine.advance()
-            assertEquals(cakeScreen, backToCake)
+            engine.dispatch(Intent.Advanced)
+            assertEquals(cakeScreen, engine.state.value.displayText)
         }
 
     @Test
-    fun `advance pages through NOTES-EXE all four history entries back to the admin shell`() =
+    fun `Advanced pages through NOTES-EXE all four history entries back to the admin shell`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)
-            engine.bootTurn()
-            engine.submitLine("LOGON")
-            engine.submitLine("CJOHNSON")
-            engine.submitLine("TIER3")
-            val page1 = engine.submitLine("NOTES")
-            assertTrue(page1.contains("1953"))
+            engine.dispatch(Intent.Boot)
+            engine.dispatch(Intent.LineSubmitted("LOGON"))
+            engine.dispatch(Intent.LineSubmitted("CJOHNSON"))
+            engine.dispatch(Intent.LineSubmitted("TIER3"))
+            engine.dispatch(Intent.LineSubmitted("NOTES"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("1953"),
+            )
 
-            val page2 = engine.advance()
-            assertTrue(page2.contains("1979"))
-            engine.advance() // page 3
-            val page4 = engine.advance()
-            assertTrue(page4.contains("[END]"))
+            engine.dispatch(Intent.Advanced)
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("1979"),
+            )
+            engine.dispatch(Intent.Advanced) // page 3
+            engine.dispatch(Intent.Advanced)
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("[END]"),
+            )
 
-            val backToShell = engine.advance()
-            assertTrue(backToShell.contains("ADMIN>"))
+            engine.dispatch(Intent.Advanced)
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ADMIN>"),
+            )
         }
 
     @Test
-    fun `page paginates question 21's choices and back without touching the input line`() =
+    fun `Paged paginates question 21's choices and back without touching the input line`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)
-            engine.bootTurn()
-            engine.submitLine("LOGON")
-            engine.submitLine("TESTER")
-            engine.submitLine("PORTAL")
-            engine.submitLine("APPLY")
-            engine.submitLine("CONTINUE")
-            engine.submitLine("CONTINUE")
+            engine.dispatch(Intent.Boot)
+            engine.dispatch(Intent.LineSubmitted("LOGON"))
+            engine.dispatch(Intent.LineSubmitted("TESTER"))
+            engine.dispatch(Intent.LineSubmitted("PORTAL"))
+            engine.dispatch(Intent.LineSubmitted("APPLY"))
+            engine.dispatch(Intent.LineSubmitted("CONTINUE"))
+            engine.dispatch(Intent.LineSubmitted("CONTINUE"))
             for (question in TerminalData.questions.take(20)) {
-                engine.submitLine(if (question.type == QuestionType.TEXT) "AN ANSWER" else "1")
+                engine.dispatch(Intent.LineSubmitted(if (question.type == QuestionType.TEXT) "AN ANSWER" else "1"))
             }
 
-            val firstPage = engine.liveLine.value
+            val firstPage = engine.state.value.displayText
             assertTrue(firstPage.contains("total choices"))
 
-            val secondPage = engine.page(104)
+            engine.dispatch(Intent.Paged(104))
+            val secondPage = engine.state.value.displayText
             assertNotEquals(firstPage, secondPage)
 
-            val backToFirst = engine.page(-104)
-            assertEquals(firstPage, backToFirst)
+            engine.dispatch(Intent.Paged(-104))
+            assertEquals(firstPage, engine.state.value.displayText)
         }
 
     @Test
-    fun `submitLine sets exitRequested on LOGOUT - with the farewell message in the content`() =
+    fun `LineSubmitted sets exitRequested on LOGOUT - with the farewell message in the content`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)
-            engine.bootTurn()
-            engine.submitLine("LOGON")
-            engine.submitLine("TESTER")
-            engine.submitLine("PORTAL")
-            val result = engine.submitLine("LOGOUT")
+            engine.dispatch(Intent.Boot)
+            engine.dispatch(Intent.LineSubmitted("LOGON"))
+            engine.dispatch(Intent.LineSubmitted("TESTER"))
+            engine.dispatch(Intent.LineSubmitted("PORTAL"))
+            engine.dispatch(Intent.LineSubmitted("LOGOUT"))
 
-            assertTrue(engine.exitRequested.value)
-            assertTrue(result.contains("ERROR: STORE NOT FOUND"))
+            assertTrue(engine.state.value.exitRequested)
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR: STORE NOT FOUND"),
+            )
         }
 
     @Test
-    fun `captureState and restoring on a new instance resumes with no observable difference`() =
+    fun `state and restoring on a new instance resumes with no observable difference`() =
         runTest {
             val original = TerminalEngine(instantReveal = true)
-            original.bootTurn()
-            original.submitLine("LOGON")
-            original.submitLine("TESTER")
+            original.dispatch(Intent.Boot)
+            original.dispatch(Intent.LineSubmitted("LOGON"))
+            original.dispatch(Intent.LineSubmitted("TESTER"))
 
             // "Pause" here, as a stateless host would between two HTTP calls.
-            val snapshot = original.captureState()
+            val snapshot = original.state.value
             val resumed = TerminalEngine(instantReveal = true, initialState = snapshot)
 
-            val originalResult = original.submitLine("PORTAL")
-            val resumedResult = resumed.submitLine("PORTAL")
+            original.dispatch(Intent.LineSubmitted("PORTAL"))
+            resumed.dispatch(Intent.LineSubmitted("PORTAL"))
 
-            assertEquals(originalResult, resumedResult)
-            assertTrue(resumedResult.contains("B:\\>"))
+            assertEquals(original.state.value.displayText, resumed.state.value.displayText)
+            assertTrue(
+                resumed.state.value.displayText
+                    .contains("B:\\>"),
+            )
         }
 
     @Test
     fun `a captured mid-form snapshot round-trips through EngineState fully intact`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)
-            engine.bootTurn()
-            engine.submitLine("LOGON")
-            engine.submitLine("TESTER")
-            engine.submitLine("PORTAL")
-            engine.submitLine("APPLY")
-            engine.submitLine("CONTINUE")
-            engine.submitLine("CONTINUE")
-            engine.submitLine("AN ANSWER") // -> question 2
+            engine.dispatch(Intent.Boot)
+            engine.dispatch(Intent.LineSubmitted("LOGON"))
+            engine.dispatch(Intent.LineSubmitted("TESTER"))
+            engine.dispatch(Intent.LineSubmitted("PORTAL"))
+            engine.dispatch(Intent.LineSubmitted("APPLY"))
+            engine.dispatch(Intent.LineSubmitted("CONTINUE"))
+            engine.dispatch(Intent.LineSubmitted("CONTINUE"))
+            engine.dispatch(Intent.LineSubmitted("AN ANSWER")) // -> question 2
 
-            val snapshot = engine.captureState()
+            val snapshot = engine.state.value
             val resumed = TerminalEngine(instantReveal = true, initialState = snapshot)
 
-            assertEquals(engine.liveLine.value, resumed.liveLine.value)
-            assertEquals(snapshot, resumed.captureState())
+            assertEquals(engine.state.value.displayText, resumed.state.value.displayText)
+            assertEquals(snapshot, resumed.state.value)
         }
 
     @Test
     fun `a captured UID-screen snapshot round-trips its blink annotation through EngineState`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)
-            engine.bootTurn()
-            engine.submitLine("LOGON")
-            engine.submitLine("TESTER")
-            engine.submitLine("PORTAL")
-            engine.submitLine("APPLY")
-            engine.submitLine("CONTINUE") // -> UID display screen, the one blinking screen
+            engine.dispatch(Intent.Boot)
+            engine.dispatch(Intent.LineSubmitted("LOGON"))
+            engine.dispatch(Intent.LineSubmitted("TESTER"))
+            engine.dispatch(Intent.LineSubmitted("PORTAL"))
+            engine.dispatch(Intent.LineSubmitted("APPLY"))
+            engine.dispatch(Intent.LineSubmitted("CONTINUE")) // -> UID display screen, the one blinking screen
 
-            val snapshot = engine.captureState()
+            val snapshot = engine.state.value
             assertTrue(snapshot.annotations.any { it.tag == BLINK_TAG })
 
             val resumed = TerminalEngine(instantReveal = true, initialState = snapshot)
-            assertEquals(snapshot, resumed.captureState())
-            assertEquals(snapshot.annotations, resumed.annotations.value)
+            assertEquals(snapshot, resumed.state.value)
+            assertEquals(snapshot.annotations, resumed.state.value.annotations)
         }
 }

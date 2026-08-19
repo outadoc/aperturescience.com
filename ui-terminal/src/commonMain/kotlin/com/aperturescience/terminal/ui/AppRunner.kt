@@ -35,7 +35,7 @@ fun runTerminalApp() {
         val mosaicJob = launch { runMosaic { App(engine) } }
         val watcherJob =
             launch {
-                engine.exitRequested.first { it }
+                engine.state.first { it.exitRequested }
                 mosaicJob.cancel()
             }
         mosaicJob.join()

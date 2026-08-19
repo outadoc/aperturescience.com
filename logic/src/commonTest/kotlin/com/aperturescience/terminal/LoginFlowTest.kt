@@ -1,5 +1,6 @@
 package com.aperturescience.terminal
 
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -12,7 +13,7 @@ class LoginFlowTest {
     fun `boot shows the bare login prompt`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
-            assertEquals("> ", engine.liveLine.value)
+            assertEquals("> ", engine.state.value.displayText)
         }
 
     @Test
@@ -20,7 +21,7 @@ class LoginFlowTest {
         runTest {
             val engine = bootAndSettle(TerminalEngine())
             submit(engine, "NONSENSE")
-            assertEquals("> ", engine.liveLine.value)
+            assertEquals("> ", engine.state.value.displayText)
         }
 
     @Test
@@ -30,8 +31,9 @@ class LoginFlowTest {
                 val engine = bootAndSettle(TerminalEngine())
                 submit(engine, keyword)
                 assertTrue(
-                    engine.liveLine.value.contains("Username>"),
-                    "expected Username prompt after '$keyword', got: ${engine.liveLine.value}",
+                    engine.state.value.displayText
+                        .contains("Username>"),
+                    "expected Username prompt after '$keyword', got: ${engine.state.value.displayText}",
                 )
             }
         }
@@ -41,12 +43,15 @@ class LoginFlowTest {
         runTest {
             val engine = bootAndSettle(TerminalEngine())
             submit(engine, "HELP")
-            val crisisMessage = engine.liveLine.value
+            val crisisMessage = engine.state.value.displayText
             assertTrue(crisisMessage.contains("mobilized"))
 
             // The next screen behaves exactly like the original bare "> " prompt again.
             submit(engine, "LOGON")
-            assertTrue(engine.liveLine.value.contains("Username>"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("Username>"),
+            )
         }
 
     @Test
@@ -54,7 +59,10 @@ class LoginFlowTest {
         runTest {
             val engine = bootAndSettle(TerminalEngine())
             submit(engine, "?")
-            assertTrue(engine.liveLine.value.contains("mobilized"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("mobilized"),
+            )
         }
 
     @Test
@@ -63,8 +71,14 @@ class LoginFlowTest {
             val engine = bootAndSettle(TerminalEngine())
             submit(engine, "LOGON")
             submit(engine, "AB")
-            assertTrue(engine.liveLine.value.contains("Username>"))
-            assertFalse(engine.liveLine.value.contains("Password>"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("Username>"),
+            )
+            assertFalse(
+                engine.state.value.displayText
+                    .contains("Password>"),
+            )
         }
 
     @Test
@@ -73,7 +87,10 @@ class LoginFlowTest {
             val engine = bootAndSettle(TerminalEngine())
             submit(engine, "LOGON")
             submit(engine, "ABC")
-            assertTrue(engine.liveLine.value.contains("Password>"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("Password>"),
+            )
         }
 
     @Test
@@ -81,9 +98,18 @@ class LoginFlowTest {
         runTest {
             for (password in listOf("PORTAL", "PORTALS")) {
                 val engine = loginToShell(username = "TESTER", password = password)
-                assertTrue(engine.liveLine.value.contains("B:\\>"))
-                assertTrue(engine.liveLine.value.contains("GLaDOS v1.07 "))
-                assertFalse(engine.liveLine.value.contains("v1.07a"))
+                assertTrue(
+                    engine.state.value.displayText
+                        .contains("B:\\>"),
+                )
+                assertTrue(
+                    engine.state.value.displayText
+                        .contains("GLaDOS v1.07 "),
+                )
+                assertFalse(
+                    engine.state.value.displayText
+                        .contains("v1.07a"),
+                )
             }
         }
 
@@ -94,19 +120,34 @@ class LoginFlowTest {
             submit(engine, "LOGON")
             submit(engine, "TESTER")
             submit(engine, "WRONGPASSWORD")
-            assertTrue(engine.liveLine.value.contains("ERROR 07 [Incorrect Password]"))
-            assertTrue(engine.liveLine.value.contains("Password>"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 07 [Incorrect Password]"),
+            )
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("Password>"),
+            )
 
             submit(engine, "PORTAL")
-            assertTrue(engine.liveLine.value.contains("B:\\>"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("B:\\>"),
+            )
         }
 
     @Test
     fun `CJOHNSON with TIER3 logs into the admin shell`() =
         runTest {
             val engine = loginAsAdmin()
-            assertTrue(engine.liveLine.value.contains("ADMIN>"))
-            assertTrue(engine.liveLine.value.contains("v1.07a"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ADMIN>"),
+            )
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("v1.07a"),
+            )
         }
 
     @Test
@@ -116,7 +157,10 @@ class LoginFlowTest {
             submit(engine, "LOGON")
             submit(engine, "CJOHNSON")
             submit(engine, "PORTAL")
-            assertTrue(engine.liveLine.value.contains("ERROR 07 [Incorrect Password]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 07 [Incorrect Password]"),
+            )
         }
 
     @Test
@@ -128,11 +172,20 @@ class LoginFlowTest {
             submit(engine, "LOGON")
             submit(engine, "CJOHNSON")
             submit(engine, "WRONGPASSWORD")
-            assertTrue(engine.liveLine.value.contains("ERROR 07 [Incorrect Password]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ERROR 07 [Incorrect Password]"),
+            )
 
             submit(engine, "PORTAL")
-            assertTrue(engine.liveLine.value.contains("B:\\>"))
-            assertFalse(engine.liveLine.value.contains("ADMIN>"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("B:\\>"),
+            )
+            assertFalse(
+                engine.state.value.displayText
+                    .contains("ADMIN>"),
+            )
         }
 
     @Test
@@ -142,15 +195,27 @@ class LoginFlowTest {
             submit(engine, "LOGON")
             submit(engine, "TESTER")
 
-            engine.onKeyEvent("P")
+            launch { engine.dispatch(Intent.KeyPressed("P")) }
             advanceUntilIdle()
-            assertTrue(engine.liveLine.value.endsWith("*"))
-            assertFalse(engine.liveLine.value.endsWith("P"))
+            assertTrue(
+                engine.state.value.displayText
+                    .endsWith("*"),
+            )
+            assertFalse(
+                engine.state.value.displayText
+                    .endsWith("P"),
+            )
 
-            engine.onKeyEvent("O")
-            engine.onKeyEvent("R")
+            launch { engine.dispatch(Intent.KeyPressed("O")) }
+            launch { engine.dispatch(Intent.KeyPressed("R")) }
             advanceUntilIdle()
-            assertTrue(engine.liveLine.value.endsWith("***"))
-            assertFalse(engine.liveLine.value.contains("POR"))
+            assertTrue(
+                engine.state.value.displayText
+                    .endsWith("***"),
+            )
+            assertFalse(
+                engine.state.value.displayText
+                    .contains("POR"),
+            )
         }
 }

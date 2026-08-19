@@ -12,7 +12,7 @@ class CakeBossKeyTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "THECAKEISALIE")
-            val output = engine.liveLine.value
+            val output = engine.state.value.displayText
             assertTrue(output.contains("When was the last time you left the building?"))
             assertTrue(output.contains("If a supervisor walks by, press return!"))
         }
@@ -22,10 +22,10 @@ class CakeBossKeyTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "THECAKEISALIE")
-            val cakeScreen = engine.liveLine.value
+            val cakeScreen = engine.state.value.displayText
 
             pressKey(engine, "X")
-            val bosskeyScreen = engine.liveLine.value
+            val bosskeyScreen = engine.state.value.displayText
             assertNotEquals(cakeScreen, bosskeyScreen)
             assertTrue(bosskeyScreen.contains("TOTAL"))
             assertTrue(bosskeyScreen.contains("976,076.49"))
@@ -36,11 +36,11 @@ class CakeBossKeyTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "THECAKEISALIE")
-            val cakeScreen = engine.liveLine.value
+            val cakeScreen = engine.state.value.displayText
 
             pressKey(engine, "X")
             pressKey(engine, "Y")
-            assertEquals(cakeScreen, engine.liveLine.value)
+            assertEquals(cakeScreen, engine.state.value.displayText)
         }
 
     @Test
@@ -48,11 +48,11 @@ class CakeBossKeyTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "THECAKEISALIE")
-            val cakeScreen = engine.liveLine.value
+            val cakeScreen = engine.state.value.displayText
 
             repeat(10) { pressKey(engine, "Q") }
             // an even number of toggles lands back on the cake screen
-            assertEquals(cakeScreen, engine.liveLine.value)
+            assertEquals(cakeScreen, engine.state.value.displayText)
         }
 
     @Test
@@ -61,10 +61,10 @@ class CakeBossKeyTest {
             for (key in listOf("PageUp", "PageDown", "ArrowLeft")) {
                 val engine = loginToShell()
                 submit(engine, "THECAKEISALIE")
-                val cakeScreen = engine.liveLine.value
+                val cakeScreen = engine.state.value.displayText
 
                 pressKey(engine, key)
-                assertNotEquals(cakeScreen, engine.liveLine.value, "expected '$key' to toggle the loop")
+                assertNotEquals(cakeScreen, engine.state.value.displayText, "expected '$key' to toggle the loop")
             }
         }
 
@@ -73,10 +73,10 @@ class CakeBossKeyTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "THECAKEISALIE")
-            val before = engine.liveLine.value
+            val before = engine.state.value.displayText
 
             pressKey(engine, "Escape")
-            assertEquals(before, engine.liveLine.value)
+            assertEquals(before, engine.state.value.displayText)
         }
 
     @Test
@@ -86,6 +86,6 @@ class CakeBossKeyTest {
             submit(engine, "THECAKEISALIE")
             pressKey(engine, "X")
             pressKey(engine, "Y")
-            assertTrue(!engine.exitRequested.value)
+            assertTrue(!engine.state.value.exitRequested)
         }
 }

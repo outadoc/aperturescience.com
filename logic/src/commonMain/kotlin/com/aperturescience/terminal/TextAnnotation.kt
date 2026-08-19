@@ -11,7 +11,7 @@ data class TextAnnotation(
 
 /**
  * [text] plus zero or more [annotations] over it - a convenience bundle for callers that want
- * both together (see [TerminalEngine.liveLine]/[TerminalEngine.annotations]).
+ * both together (see [EngineState.displayText]/[EngineState.annotations]).
  */
 data class AnnotatedText(
     val text: String,

@@ -17,8 +17,14 @@ class NotesExeTest {
         runTest {
             val engine = loginAsAdmin()
             submit(engine, "NOTES")
-            assertTrue(engine.liveLine.value.contains("1953"))
-            assertTrue(engine.liveLine.value.contains("[MORE]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("1953"),
+            )
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("[MORE]"),
+            )
         }
 
     @Test
@@ -27,12 +33,21 @@ class NotesExeTest {
             val engine = loginAsAdmin()
             submit(engine, "NOTES")
 
-            assertTrue(engine.liveLine.value.contains("1953"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("1953"),
+            )
             pressKey(engine, "Enter")
-            assertTrue(engine.liveLine.value.contains("1979"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("1979"),
+            )
             pressKey(engine, "Enter")
             pressKey(engine, "Enter")
-            assertTrue(engine.liveLine.value.contains("[END]"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("[END]"),
+            )
         }
 
     @Test
@@ -40,10 +55,10 @@ class NotesExeTest {
         runTest {
             val engine = loginAsAdmin()
             submit(engine, "NOTES")
-            val firstPage = engine.liveLine.value
+            val firstPage = engine.state.value.displayText
 
             pressKey(engine, "A")
-            assertTrue(engine.liveLine.value != firstPage)
+            assertTrue(engine.state.value.displayText != firstPage)
         }
 
     @Test
@@ -52,10 +67,10 @@ class NotesExeTest {
             for (key in listOf("PageUp", "PageDown", "ArrowLeft")) {
                 val engine = loginAsAdmin()
                 submit(engine, "NOTES")
-                val firstPage = engine.liveLine.value
+                val firstPage = engine.state.value.displayText
 
                 pressKey(engine, key)
-                assertTrue(engine.liveLine.value != firstPage, "expected '$key' to advance a page")
+                assertTrue(engine.state.value.displayText != firstPage, "expected '$key' to advance a page")
             }
         }
 
@@ -64,10 +79,10 @@ class NotesExeTest {
         runTest {
             val engine = loginAsAdmin()
             submit(engine, "NOTES")
-            val before = engine.liveLine.value
+            val before = engine.state.value.displayText
 
             pressKey(engine, "Escape")
-            assertEquals(before, engine.liveLine.value)
+            assertEquals(before, engine.state.value.displayText)
         }
 
     @Test
@@ -78,6 +93,9 @@ class NotesExeTest {
 
             repeat(4) { pressKey(engine, "Enter") }
 
-            assertTrue(engine.liveLine.value.contains("ADMIN>"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ADMIN>"),
+            )
         }
 }

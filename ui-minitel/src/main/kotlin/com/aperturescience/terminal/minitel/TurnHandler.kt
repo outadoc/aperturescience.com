@@ -1,9 +1,12 @@
 package com.aperturescience.terminal.minitel
 
 import com.aperturescience.terminal.BLINK_TAG
+import com.aperturescience.terminal.Intent
 import com.aperturescience.terminal.Mode
+import com.aperturescience.terminal.PAGE_SIZE
 import com.aperturescience.terminal.TerminalEngine
 import com.aperturescience.terminal.data.TerminalData
+import com.aperturescience.terminal.displayText
 import fr.outadoc.minipavi.core.model.FunctionKey
 import fr.outadoc.minipavi.core.model.GatewayRequest
 import fr.outadoc.minipavi.core.model.ServiceResponse
@@ -29,15 +32,15 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
     if (request.event is GatewayRequest.Event.Connection) {
         // Fresh engine so `uid` is randomly synthesized, not restored from the placeholder state.
         val engine = TerminalEngine(instantReveal = true)
-        engine.setViewportWidth(ScreenChunker.WRAP_WIDTH)
-        engine.bootTurn()
+        engine.dispatch(Intent.ViewportResized(ScreenChunker.WRAP_WIDTH))
+        engine.dispatch(Intent.Boot)
         return render(engine, chunkIndex = 0)
     }
 
     val engine = TerminalEngine(instantReveal = true, initialState = state.toEngineState())
-    engine.setViewportWidth(ScreenChunker.WRAP_WIDTH)
+    engine.dispatch(Intent.ViewportResized(ScreenChunker.WRAP_WIDTH))
 
-    val chunksBefore = ScreenChunker.chunk(engine.liveLine.value)
+    val chunksBefore = ScreenChunker.chunk(engine.state.value.displayText)
     val lastChunkIndex = chunksBefore.lastIndex
     val functionKey = (request.event as? GatewayRequest.Event.KeyboardInput)?.key
 
@@ -63,19 +66,19 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
             // no-op
         }
         chunkIndex == lastChunkIndex && hasOpenInputZone(mode) && functionKey == FunctionKey.Envoi -> {
-            engine.submitLine(request.userInput.firstOrNull().orEmpty())
+            engine.dispatch(Intent.LineSubmitted(request.userInput.firstOrNull().orEmpty()))
             chunkIndex = 0
         }
         chunkIndex == lastChunkIndex && isAnyKeyMode(mode) && functionKey != null -> {
-            engine.advance()
+            engine.dispatch(Intent.Advanced)
             chunkIndex = 0
         }
         chunkIndex == lastChunkIndex && q21PaginationActive && functionKey == FunctionKey.Suite -> {
-            engine.page(TerminalEngine.PAGE_SIZE)
+            engine.dispatch(Intent.Paged(PAGE_SIZE))
             chunkIndex = 0
         }
         chunkIndex == lastChunkIndex && q21PaginationActive && functionKey == FunctionKey.Retour -> {
-            engine.page(-TerminalEngine.PAGE_SIZE)
+            engine.dispatch(Intent.Paged(-PAGE_SIZE))
             chunkIndex = 0
         }
         else -> {
@@ -83,7 +86,7 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
         }
     }
 
-    if (engine.exitRequested.value) {
+    if (engine.state.value.exitRequested) {
         // Show the farewell text this turn, disconnect on the next keypress (pendingDisconnect above).
         return render(engine, chunkIndex = 0, pendingDisconnect = true)
     }
@@ -98,7 +101,7 @@ private fun isAnyKeyMode(mode: Mode): Boolean = mode is Mode.Notes || mode is Mo
 private fun isQ21PaginationActive(mode: Mode): Boolean {
     if (mode !is Mode.Application) return false
     val question = TerminalData.questions.getOrNull(mode.questionNumber - 1) ?: return false
-    return question.choices.size > TerminalEngine.PAGE_SIZE
+    return question.choices.size > PAGE_SIZE
 }
 
 private fun isPasswordPrompt(mode: Mode): Boolean = mode is Mode.Login.Password
@@ -112,13 +115,14 @@ private fun render(
     chunkIndex: Int,
     pendingDisconnect: Boolean = false,
 ): ServiceResponse<MinitelSessionState> {
-    val chunks = ScreenChunker.chunk(engine.liveLine.value)
-    val chunkOffsets = ScreenChunker.chunkStartOffsets(engine.liveLine.value)
+    val displayText = engine.state.value.displayText
+    val chunks = ScreenChunker.chunk(displayText)
+    val chunkOffsets = ScreenChunker.chunkStartOffsets(displayText)
     val safeIndex = chunkIndex.coerceIn(0, chunks.lastIndex)
     val lines = chunks[safeIndex]
     val lineOffsets = chunkOffsets[safeIndex]
     val isLastChunk = safeIndex == chunks.lastIndex
-    val state = engine.captureState()
+    val state = engine.state.value
 
     val openInputZone = isLastChunk && !pendingDisconnect && hasOpenInputZone(state.mode)
     val blinkRange = state.annotations.firstOrNull { it.tag == BLINK_TAG }?.range

@@ -1,12 +1,13 @@
 package com.aperturescience.terminal
 
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 
 //region Test-only TerminalEngine driver helpers
 
 /**
- * Sends a single raw key (as [TerminalEngine.onKeyEvent] expects it) and settles - each helper in
+ * Sends a single raw key (as [Intent.KeyPressed] expects it) and settles - each helper in
  * this file advances virtual time so callers never need real-time waits for the typewriter
  * animation.
  */
@@ -14,22 +15,24 @@ fun TestScope.pressKey(
     engine: TerminalEngine,
     key: String,
 ) {
-    engine.onKeyEvent(key)
+    launch { engine.dispatch(Intent.KeyPressed(key)) }
     advanceUntilIdle()
 }
 
 /**
- * Types [text] one character at a time via [TerminalEngine.onKeyEvent], then presses Enter and
+ * Types [text] one character at a time via [Intent.KeyPressed], then presses Enter and
  * settles.
  */
 fun TestScope.submit(
     engine: TerminalEngine,
     text: String,
 ) {
-    for (c in text) {
-        engine.onKeyEvent(c.toString())
+    launch {
+        for (c in text) {
+            engine.dispatch(Intent.KeyPressed(c.toString()))
+        }
+        engine.dispatch(Intent.KeyPressed("Enter"))
     }
-    engine.onKeyEvent("Enter")
     advanceUntilIdle()
 }
 
@@ -37,7 +40,7 @@ fun TestScope.submit(
  * Boots [engine] and settles once the initial `"> "` prompt has fully revealed.
  */
 fun TestScope.bootAndSettle(engine: TerminalEngine): TerminalEngine {
-    engine.boot(this)
+    launch { engine.dispatch(Intent.Boot) }
     advanceUntilIdle()
     return engine
 }

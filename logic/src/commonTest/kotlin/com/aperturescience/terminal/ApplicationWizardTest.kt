@@ -38,7 +38,10 @@ class ApplicationWizardTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "APPLY")
-            assertTrue(engine.liveLine.value.contains("ENRICHMENT CENTER TEST SUBJECT APPLICATION"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("ENRICHMENT CENTER TEST SUBJECT APPLICATION"),
+            )
         }
 
     @Test
@@ -47,7 +50,10 @@ class ApplicationWizardTest {
             val engine = loginToShell()
             submit(engine, "APPLY")
             submit(engine, "QUIT")
-            assertTrue(engine.liveLine.value.contains("B:\\>"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("B:\\>"),
+            )
         }
 
     @Test
@@ -56,8 +62,14 @@ class ApplicationWizardTest {
             val engine = loginToShell()
             submit(engine, "APPLY")
             submit(engine, "CONTINUE")
-            assertTrue(engine.liveLine.value.contains("Unique Indentity Number"))
-            assertTrue(engine.liveLine.value.contains("["))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("Unique Indentity Number"),
+            )
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("["),
+            )
         }
 
     @Test
@@ -67,7 +79,10 @@ class ApplicationWizardTest {
             submit(engine, "APPLY")
             submit(engine, "CONTINUE")
             submit(engine, "QUIT")
-            assertTrue(engine.liveLine.value.contains("B:\\>"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("B:\\>"),
+            )
         }
 
     @Test
@@ -76,45 +91,65 @@ class ApplicationWizardTest {
             val engine = loginToShell()
             submit(engine, "APPLY")
             submit(engine, "CONTINUE")
-            val annotation = engine.annotations.value.singleOrNull { it.tag == BLINK_TAG }
+            val annotation =
+                engine.state.value.annotations
+                    .singleOrNull { it.tag == BLINK_TAG }
             assertTrue(annotation != null)
             val range = annotation.range
-            assertEquals("[${engine.captureState().uid}]", engine.liveLine.value.substring(range.first, range.last + 1))
+            assertEquals(
+                "[${engine.state.value.uid}]",
+                engine.state.value.displayText.substring(
+                    range.first,
+                    range.last + 1,
+                ),
+            )
         }
 
     @Test
     fun `annotations are empty on screens with no blinking content`() =
         runTest {
             val engine = loginToShell()
-            assertTrue(engine.annotations.value.isEmpty())
+            assertTrue(
+                engine.state.value.annotations
+                    .isEmpty(),
+            )
             submit(engine, "APPLY")
-            assertTrue(engine.annotations.value.isEmpty())
+            assertTrue(
+                engine.state.value.annotations
+                    .isEmpty(),
+            )
         }
 
     @Test
     fun `a narrow viewport wraps the UID across lines without losing or duplicating a character`() =
         runTest {
             val engine = loginToShell()
-            engine.setViewportWidth(20) // forces the 66-char bracketed UID to hard-wrap
+            engine.dispatch(Intent.ViewportResized(20)) // forces the 66-char bracketed UID to hard-wrap
             submit(engine, "APPLY")
             submit(engine, "CONTINUE")
             val range =
-                engine.annotations.value
+                engine.state.value.annotations
                     .single { it.tag == BLINK_TAG }
                     .range
             val blinkingText =
-                engine.liveLine.value
+                engine.state.value.displayText
                     .substring(range.first, range.last + 1)
                     .replace("\n", "")
-            assertEquals("[${engine.captureState().uid}]", blinkingText)
+            assertEquals("[${engine.state.value.uid}]", blinkingText)
         }
 
     @Test
     fun `CONTINUE at the UID screen shows question 1`() =
         runTest {
             val engine = enterApplication()
-            assertTrue(engine.liveLine.value.contains("Page 1"))
-            assertTrue(engine.liveLine.value.contains(TerminalData.questions[0].text))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("Page 1"),
+            )
+            assertTrue(
+                engine.state.value.displayText
+                    .contains(TerminalData.questions[0].text),
+            )
         }
 
     @Test
@@ -123,7 +158,10 @@ class ApplicationWizardTest {
             val engine = enterApplication()
             check(TerminalData.questions[0].type == QuestionType.TEXT) { "test assumes Q1 is free text" }
             submit(engine, "WHATEVER I FEEL LIKE TYPING")
-            assertTrue(engine.liveLine.value.contains("Page 2"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("Page 2"),
+            )
         }
 
     @Test
@@ -134,9 +172,9 @@ class ApplicationWizardTest {
             val question2 = TerminalData.questions[1]
             check(question2.type != QuestionType.TEXT) { "test assumes Q2 is a choice question" }
 
-            val before = engine.liveLine.value
+            val before = engine.state.value.displayText
             submit(engine, (question2.choices.size + 99).toString())
-            assertEquals(before, engine.liveLine.value)
+            assertEquals(before, engine.state.value.displayText)
         }
 
     @Test
@@ -144,9 +182,9 @@ class ApplicationWizardTest {
         runTest {
             val engine = enterApplication()
             submit(engine, genericAnswerFor(TerminalData.questions[0])) // -> question 2
-            val before = engine.liveLine.value
+            val before = engine.state.value.displayText
             submit(engine, "NOT A NUMBER")
-            assertEquals(before, engine.liveLine.value)
+            assertEquals(before, engine.state.value.displayText)
         }
 
     @Test
@@ -155,7 +193,10 @@ class ApplicationWizardTest {
             val engine = enterApplication()
             submit(engine, genericAnswerFor(TerminalData.questions[0])) // -> question 2
             submit(engine, "1")
-            assertTrue(engine.liveLine.value.contains("Page 3"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("Page 3"),
+            )
         }
 
     @Test
@@ -163,7 +204,10 @@ class ApplicationWizardTest {
         runTest {
             val engine = enterApplication()
             submit(engine, "QUIT")
-            assertTrue(engine.liveLine.value.contains("B:\\>"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("B:\\>"),
+            )
         }
 
     @Test
@@ -172,7 +216,7 @@ class ApplicationWizardTest {
             val engine = enterApplication()
             answerQuestions(engine, TerminalData.questions)
 
-            val output = engine.liveLine.value
+            val output = engine.state.value.displayText
             assertTrue(output.contains("Congratulations!"))
             assertTrue(output.contains("64 digit UIN"))
         }
@@ -183,7 +227,10 @@ class ApplicationWizardTest {
             val engine = enterApplication()
             answerQuestions(engine, TerminalData.questions)
             submit(engine, "THECAKEISALIE")
-            assertTrue(engine.liveLine.value.contains("left the building"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("left the building"),
+            )
         }
 
     @Test
@@ -193,14 +240,14 @@ class ApplicationWizardTest {
             answerQuestions(engine, TerminalData.questions)
             submit(engine, "0000000000000000")
 
-            val deadEnd = engine.liveLine.value
+            val deadEnd = engine.state.value.displayText
             assertTrue(deadEnd.contains("does not match"))
             assertTrue(deadEnd.contains("REMAIN AT YOUR WORKSTATION"))
 
             submit(engine, "ANYTHING")
-            assertEquals(deadEnd, engine.liveLine.value)
+            assertEquals(deadEnd, engine.state.value.displayText)
             submit(engine, "LOGON")
-            assertEquals(deadEnd, engine.liveLine.value)
+            assertEquals(deadEnd, engine.state.value.displayText)
         }
 
     @Test
@@ -212,7 +259,10 @@ class ApplicationWizardTest {
             val question21 = TerminalData.questions[20]
             assertEquals(21, question21.index)
             assertTrue(question21.choices.size > 104)
-            assertTrue(engine.liveLine.value.contains("${question21.choices.size} total choices"))
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("${question21.choices.size} total choices"),
+            )
         }
 
     @Test
@@ -221,13 +271,13 @@ class ApplicationWizardTest {
             val engine = enterApplication()
             answerQuestions(engine, TerminalData.questions.take(20))
 
-            val firstPage = engine.liveLine.value
+            val firstPage = engine.state.value.displayText
             pressKey(engine, "PageDown")
-            val secondPage = engine.liveLine.value
+            val secondPage = engine.state.value.displayText
             assertNotEquals(firstPage, secondPage)
 
             pressKey(engine, "PageUp")
-            assertEquals(firstPage, engine.liveLine.value)
+            assertEquals(firstPage, engine.state.value.displayText)
         }
 
     /**
@@ -241,14 +291,14 @@ class ApplicationWizardTest {
             answerQuestions(engine, TerminalData.questions.take(20))
 
             val totalChoices = TerminalData.questions[20].choices.size
-            val pressesToLastPage = totalChoices / TerminalEngine.PAGE_SIZE
+            val pressesToLastPage = totalChoices / PAGE_SIZE
             repeat(pressesToLastPage) { pressKey(engine, "PageDown") }
 
-            val lastPage = engine.liveLine.value
+            val lastPage = engine.state.value.displayText
             assertTrue(lastPage.endsWith("Zorilla\n[$totalChoices total choices : PGUP/PGDN to navigate]> "))
 
             pressKey(engine, "PageDown")
-            assertEquals(lastPage, engine.liveLine.value)
+            assertEquals(lastPage, engine.state.value.displayText)
         }
 
     @Test
@@ -257,9 +307,9 @@ class ApplicationWizardTest {
             val engine = enterApplication()
             answerQuestions(engine, TerminalData.questions.take(20))
 
-            val firstPage = engine.liveLine.value
+            val firstPage = engine.state.value.displayText
             pressKey(engine, "PageUp")
-            assertEquals(firstPage, engine.liveLine.value)
+            assertEquals(firstPage, engine.state.value.displayText)
         }
 
     @Test
@@ -269,20 +319,20 @@ class ApplicationWizardTest {
             submit(engine, genericAnswerFor(TerminalData.questions[0])) // -> question 2 (5 choices)
             check(TerminalData.questions[1].choices.size <= 104)
 
-            val before = engine.liveLine.value
+            val before = engine.state.value.displayText
             pressKey(engine, "PageDown")
-            assertEquals(before, engine.liveLine.value)
+            assertEquals(before, engine.state.value.displayText)
             pressKey(engine, "PageUp")
-            assertEquals(before, engine.liveLine.value)
+            assertEquals(before, engine.state.value.displayText)
         }
 
     @Test
     fun `PageUp and PageDown do nothing outside the application questionnaire`() =
         runTest {
             val engine = loginToShell()
-            val before = engine.liveLine.value
+            val before = engine.state.value.displayText
             pressKey(engine, "PageDown")
-            assertEquals(before, engine.liveLine.value)
+            assertEquals(before, engine.state.value.displayText)
         }
 
     @Test
@@ -290,6 +340,6 @@ class ApplicationWizardTest {
         runTest {
             val engine = enterApplication()
             answerQuestions(engine, TerminalData.questions)
-            assertFalse(engine.exitRequested.value)
+            assertFalse(engine.state.value.exitRequested)
         }
 }

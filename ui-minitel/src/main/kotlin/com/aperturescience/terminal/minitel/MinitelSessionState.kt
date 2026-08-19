@@ -5,7 +5,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * The `TState` MiniPavi round-trips every call. Mirrors [EngineState] field-for-field, plus
- * [chunkIndex] (see [ScreenChunker]) and [pendingDisconnect] (see [TurnHandler]).
+ * [chunkIndex] and [pendingDisconnect] - omits fields that are always default between turns.
  */
 @Serializable
 data class MinitelSessionState(

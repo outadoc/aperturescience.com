@@ -10,7 +10,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.aperturescience.terminal.BLINK_TAG
+import com.aperturescience.terminal.Intent
 import com.aperturescience.terminal.TerminalEngine
+import com.aperturescience.terminal.WRAP_WIDTH
+import com.aperturescience.terminal.displayText
 import com.jakewharton.mosaic.LocalTerminalState
 import com.jakewharton.mosaic.layout.onKeyEvent
 import com.jakewharton.mosaic.modifier.Modifier
@@ -19,6 +22,7 @@ import com.jakewharton.mosaic.text.buildAnnotatedString
 import com.jakewharton.mosaic.ui.Text
 import com.jakewharton.mosaic.ui.TextStyle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val BLINK_INTERVAL_MS = 500L
@@ -30,15 +34,15 @@ fun App(engine: TerminalEngine) {
     // Mosaic's Text never soft-wraps on its own, so feed it the real column count (recomposes on
     // resize), capped at WRAP_WIDTH to match the original's own pixel-wrap threshold.
     val columns = LocalTerminalState.current.size.columns
-    SideEffect { engine.setViewportWidth(minOf(columns, TerminalEngine.WRAP_WIDTH)) }
+    SideEffect { scope.launch { engine.dispatch(Intent.ViewportResized(minOf(columns, WRAP_WIDTH))) } }
 
     LaunchedEffect(Unit) {
-        engine.boot(scope)
+        engine.dispatch(Intent.Boot)
     }
 
-    val liveLine by engine.liveLine.collectAsState()
-    val annotations by engine.annotations.collectAsState()
-    val blinkRange = annotations.firstOrNull { it.tag == BLINK_TAG }?.range
+    val state by engine.state.collectAsState()
+    val liveLine = state.displayText
+    val blinkRange = state.annotations.firstOrNull { it.tag == BLINK_TAG }?.range
 
     // Mosaic's TextStyle has no true blink attribute - fake it by toggling Invert on the marked
     // span on a timer instead.
@@ -58,7 +62,8 @@ fun App(engine: TerminalEngine) {
             if (event.ctrl && event.key == "c") {
                 return@onKeyEvent false
             }
-            engine.onKeyEvent(event.key)
+            scope.launch { engine.dispatch(Intent.KeyPressed(event.key)) }
+            true
         }
 
     if (blinkRange != null && blinkRange.last < liveLine.length) {
