@@ -5,7 +5,9 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import kotlinx.coroutines.runBlocking
 
-/** Embedded Ktor server the MiniPavi gateway calls once per user action - see [handleTurn]. */
+/**
+ * Embedded Ktor server the MiniPavi gateway calls once per user action - see [handleTurn].
+ */
 fun main() {
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         minitelService<MinitelSessionState>(

@@ -11,7 +11,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-/** A generic acceptable answer for any question, regardless of its type. */
+/**
+ * A generic acceptable answer for any question, regardless of its type.
+ */
 private fun genericAnswerFor(question: Question): String = if (question.type == QuestionType.TEXT) "AN ANSWER" else "1"
 
 private fun TestScope.answerQuestions(
@@ -228,8 +230,10 @@ class ApplicationWizardTest {
             assertEquals(firstPage, engine.liveLine.value)
         }
 
-    /** Matches the original: overshooting past the final page reverts to the untouched offset -
-     * PageDown there is a no-op, never landing on a spurious page isolating the last choice. */
+    /**
+     * Matches the original: overshooting past the final page reverts to the untouched offset -
+     * PageDown there is a no-op, never landing on a spurious page isolating the last choice.
+     */
     @Test
     fun `PageDown past the final page of question 21 is a no-op`() =
         runTest {

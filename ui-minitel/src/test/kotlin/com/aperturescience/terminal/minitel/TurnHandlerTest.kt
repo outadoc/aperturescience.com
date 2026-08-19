@@ -46,8 +46,10 @@ class TurnHandlerTest {
             )
         }
 
-    /** NOTES page 1 spills past one screen - Suite reveals the rest, Envoi does nothing until
-     * caught up, then advances like any accepted key. */
+    /**
+     * NOTES page 1 spills past one screen - Suite reveals the rest, Envoi does nothing until
+     * caught up, then advances like any accepted key.
+     */
     @Test
     fun `a NOTES-EXE page spanning multiple screens advances on Suite - then Envoi once caught up`() {
         // "NOTES" typed at the shell prompt, submitted with Envoi.
@@ -72,7 +74,9 @@ class TurnHandlerTest {
         assertEquals(0, page2Head.state.chunkIndex)
     }
 
-    /** Walks all four two-screen NOTES pages (Suite then Envoi each), landing back on the shell. */
+    /**
+     * Walks all four two-screen NOTES pages (Suite then Envoi each), landing back on the shell.
+     */
     @Test
     fun `paging through every NOTES-EXE page returns to the shell afterwards`() {
         var response = turn(adminShellState, FunctionKey.Envoi, userInput = listOf("NOTES")) // page 1, chunk 0
@@ -88,8 +92,10 @@ class TurnHandlerTest {
         assertEquals(MinitelMode.Shell(), backToShell.state.mode)
     }
 
-    /** Regression test: a full-width wrapped line used to double-advance the cursor, landing the
-     * input zone one row above "ADMIN>" instead of on it. */
+    /**
+     * Regression test: a full-width wrapped line used to double-advance the cursor, landing the
+     * input zone one row above "ADMIN>" instead of on it.
+     */
     @Test
     fun `the admin shell input zone lines up with the ADMIN prompt it's shown on`() {
         val connected =
@@ -117,8 +123,10 @@ class TurnHandlerTest {
         assertEquals(4, command.line)
     }
 
-    /** The UID display screen's bracketed UID must blink - reached via a regular (non-admin)
-     * login, "APPLY", then "CONTINUE". */
+    /**
+     * The UID display screen's bracketed UID must blink - reached via a regular (non-admin)
+     * login, "APPLY", then "CONTINUE".
+     */
     @Test
     fun `the UID display screen wraps the bracketed UID in VideotexBuilder's withBlink`() {
         val connected =

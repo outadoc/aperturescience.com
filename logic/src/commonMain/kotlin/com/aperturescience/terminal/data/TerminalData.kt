@@ -12,8 +12,10 @@ data class Question(
 )
 
 object TerminalData {
-    /** Login/application-flow screen text - indexed by `TerminalEngine`'s per-`Mode.Login`
-     * screen index (0..11). */
+    /**
+     * Login/application-flow screen text - indexed by `TerminalEngine`'s per-`Mode.Login`
+     * screen index (0..11).
+     */
     val loginFlowScreens: List<String> = listOf(
         "> ",
         "Username> ",
@@ -29,12 +31,16 @@ object TerminalData {
         "... > ^ >^ ^When was the last time you left the building? Do you know anyone who's left the building lately? I don't know what lunatic wrote the new lockdown policy. I don't know who's in charge. But they're building an 'Enrichment Center'. Check out this security feed. Whatever the hell a 'relaxation vault' is, it doesn't have any doors. ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^If a supervisor walks by, press return. I don't think going home is part of our job description anymore. ^ ",
     )
 
-    /** Typewriter delay in ms/char, parallel to [loginFlowScreens]. */
+    /**
+     * Typewriter delay in ms/char, parallel to [loginFlowScreens].
+     */
     val loginFlowScreenDelays: List<Int> = listOf(
         75, 75, 75, 25, 5, 10, 50, 10, 10, 10, 10, 5
     )
 
-    /** CJOHNSON-only NOTES.EXE history pages (1..4). */
+    /**
+     * CJOHNSON-only NOTES.EXE history pages (1..4).
+     */
     val notesHistoryPages: List<String> = listOf(
         "1953 - Aperture Science begins operations as a manufacturer of shower curtains. Early product line provides a very low-tech portal between the inside and outside of your shower. Very little science is actually involved. The name is chosen to make the curtains appear more hygienic.^^1956 - Eisenhower administration awards Aperture a contract to provide shower curtains to all branches of the military except the Navy.^^1957 - 1975 - Mostly shower curtains.^^1978 - Aperture Founder and CEO, Cave Johnson, is exposed to mercury while secretly developing a dangerous mercury-injected rubber sheeting from which he plans to manufacture seven deadly shower curtains to be given as gifts to each member of the House Naval Appropriations committee.^^^[MORE]",
         "1979 - Both of Cave Johnson's kidneys fail. Brain damaged, dying, and incapable of being convinced that time is not now flowing backwards, Johnson lays out a three tiered R&D program. The results, he says, will 'guarantee the continued success of Aperture Science far into the fast-approaching distant past.'^^Tier 1: The Heimlich Counter-Maneuver - A reliable technique for interrupting the life-saving Heimlich Maneuver.^^Tier 2: The Take-A-Wish Foundation - A charitable organization that will purchase wishes from the parents of terminally ill children and redistribute them to wish-deprived but otherwise healthy adults.^^Tier 3: 'Some kind of rip in the fabric of space… That would… Well, it'd be like, I don't know, something that would help with the shower curtains I guess. I haven't worked this idea out as much as the wish-taking one.'^^^[MORE]",
@@ -42,7 +48,9 @@ object TerminalData {
         "1981-1985 - Work progresses on the 'Portal' project. Several high ranking Fatah personnel choke to death on lamb chunks despite the intervention of their bodyguards.^^1986 - Word reaches Aperture management that another defense contractor called Black Mesa is working on a similar portal technology. In response to this news, Aperture begins developing the Genetic Lifeform and Disk Operating System (GLaDOS), an artificially intelligent research assistant and disk operating system.^^1996 - After a decade spent bringing the disk operating parts of GLaDOS to a state of more or less basic functionality, work begins on the Genetic Lifeform component.^^Several Years Later - The untested AI is activated for the first time as one of the planned activities on Aperture's first annual bring-your-daughter-to-work day.^^In many ways, the initial test goes well...^^^[END]",
     )
 
-    /** The 50-question job application questionnaire, in order. */
+    /**
+     * The 50-question job application questionnaire, in order.
+     */
     val questions: List<Question> = listOf(
         Question(1, "If given a choice, what would you like to be called?", QuestionType.TEXT, listOf("Name:")),
         Question(2, "It is important to consult a physician before starting an Aperture Science Enrichment Center program. If one or more of the statements listed below applies to you, please contact your supervisor to secure permission to consult a physician before beginning an Enrichment Center program. Pick the condition that most applies to you.", QuestionType.CHECKBOX, listOf("dizziness", "shortness of breath", "problems waking up in the morning", "problems staying up 48 hours straight", "have not previously performed an enrichment center program")),

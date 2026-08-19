@@ -9,8 +9,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
-/** Covers the synchronous "batch" API (`instantReveal = true`) for stateless hosts: content
- * matches the animated streaming path, and a session resumes cleanly via [TerminalEngine.captureState]. */
+/**
+ * Covers the synchronous "batch" API (`instantReveal = true`) for stateless hosts: content
+ * matches the animated streaming path, and a session resumes cleanly via [TerminalEngine.captureState].
+ */
 class BatchApiTest {
     @Test
     fun `bootTurn shows the bare login prompt - matching boot`() =

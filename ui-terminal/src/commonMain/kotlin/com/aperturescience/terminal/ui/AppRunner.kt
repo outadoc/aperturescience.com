@@ -11,8 +11,10 @@ import kotlinx.coroutines.runBlocking
 private const val ENTER_ALT_SCREEN = "[?1049h[H"
 private const val LEAVE_ALT_SCREEN = "[?1049l"
 
-/** Shared entry point for every target's `main()`: enters/leaves the alt screen buffer around
- * driving Mosaic/[TerminalEngine], via [installTerminationHandler] to also cover SIGTERM/SIGHUP. */
+/**
+ * Shared entry point for every target's `main()`: enters/leaves the alt screen buffer around
+ * driving Mosaic/[TerminalEngine], via [installTerminationHandler] to also cover SIGTERM/SIGHUP.
+ */
 fun runTerminalApp() {
     print(ENTER_ALT_SCREEN)
     flushStdout()

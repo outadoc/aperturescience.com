@@ -6,7 +6,9 @@ import kotlinx.coroutines.test.advanceUntilIdle
 // Test-only driver helpers for TerminalEngine - each advances virtual time so callers never
 // need real-time waits for the typewriter animation.
 
-/** Sends a single raw key (as [TerminalEngine.onKeyEvent] expects it) and settles. */
+/**
+ * Sends a single raw key (as [TerminalEngine.onKeyEvent] expects it) and settles.
+ */
 fun TestScope.pressKey(
     engine: TerminalEngine,
     key: String,
@@ -15,8 +17,10 @@ fun TestScope.pressKey(
     advanceUntilIdle()
 }
 
-/** Types [text] one character at a time via [TerminalEngine.onKeyEvent], then presses Enter and
- * settles. */
+/**
+ * Types [text] one character at a time via [TerminalEngine.onKeyEvent], then presses Enter and
+ * settles.
+ */
 fun TestScope.submit(
     engine: TerminalEngine,
     text: String,
@@ -28,14 +32,18 @@ fun TestScope.submit(
     advanceUntilIdle()
 }
 
-/** Boots [engine] and settles once the initial `"> "` prompt has fully revealed. */
+/**
+ * Boots [engine] and settles once the initial `"> "` prompt has fully revealed.
+ */
 fun TestScope.bootAndSettle(engine: TerminalEngine): TerminalEngine {
     engine.boot(this)
     advanceUntilIdle()
     return engine
 }
 
-/** Boots and logs in as a regular (non-admin) user, ending at the `B:\>` shell prompt. */
+/**
+ * Boots and logs in as a regular (non-admin) user, ending at the `B:\>` shell prompt.
+ */
 fun TestScope.loginToShell(
     engine: TerminalEngine = TerminalEngine(),
     username: String = "TESTER",
@@ -48,7 +56,9 @@ fun TestScope.loginToShell(
     return engine
 }
 
-/** Boots and logs in as the `CJOHNSON` admin user, ending at the `ADMIN>` shell prompt. */
+/**
+ * Boots and logs in as the `CJOHNSON` admin user, ending at the `ADMIN>` shell prompt.
+ */
 fun TestScope.loginAsAdmin(engine: TerminalEngine = TerminalEngine()): TerminalEngine {
     bootAndSettle(engine)
     submit(engine, "LOGON")

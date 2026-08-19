@@ -4,8 +4,10 @@ import com.aperturescience.terminal.Mode
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Serializable mirror of `logic`'s [Mode] (not `@Serializable` itself) - converts via
- * [toDomain]/[toData]; each case has an explicit [SerialName] to keep the wire format stable. */
+/**
+ * Serializable mirror of `logic`'s [Mode] (not `@Serializable` itself) - converts via
+ * [toDomain]/[toData]; each case has an explicit [SerialName] to keep the wire format stable.
+ */
 @Serializable
 sealed interface MinitelMode {
     @Serializable

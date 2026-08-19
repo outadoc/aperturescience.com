@@ -31,8 +31,10 @@ class ShellCommandsTest {
             assertTrue(output.contains("2 FILE(S) IN 23 BLOCKS"))
         }
 
-    /** Matches the original: a blank line pads both above "DISK VOLUME" and below the block
-     * count, same as every other shell error message (e.g. `ERROR 15 [Disk is write protected]`). */
+    /**
+     * Matches the original: a blank line pads both above "DISK VOLUME" and below the block
+     * count, same as every other shell error message (e.g. `ERROR 15 [Disk is write protected]`).
+     */
     @Test
     fun `DIR pads the listing with a blank line above and below`() =
         runTest {

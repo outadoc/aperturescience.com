@@ -3,8 +3,10 @@ package com.aperturescience.terminal.minitel
 import com.aperturescience.terminal.EngineState
 import kotlinx.serialization.Serializable
 
-/** The `TState` MiniPavi round-trips every call. Mirrors [EngineState] field-for-field, plus
- * [chunkIndex] (see [ScreenChunker]) and [pendingDisconnect] (see [TurnHandler]). */
+/**
+ * The `TState` MiniPavi round-trips every call. Mirrors [EngineState] field-for-field, plus
+ * [chunkIndex] (see [ScreenChunker]) and [pendingDisconnect] (see [TurnHandler]).
+ */
 @Serializable
 data class MinitelSessionState(
     val mode: MinitelMode,
@@ -51,8 +53,10 @@ data class MinitelSessionState(
                 )
             }
 
-        /** Placeholder for `minitelService`'s `initialState` param - never actually rendered,
-         * since [TurnHandler] builds a fresh `TerminalEngine` for every new session instead. */
+        /**
+         * Placeholder for `minitelService`'s `initialState` param - never actually rendered,
+         * since [TurnHandler] builds a fresh `TerminalEngine` for every new session instead.
+         */
         fun initial(): MinitelSessionState =
             MinitelSessionState(
                 mode = MinitelMode.Login.Initial,

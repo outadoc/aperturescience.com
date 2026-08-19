@@ -16,8 +16,10 @@ import kotlinx.coroutines.launch
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 
-/** Faithful port of `DoAction.as`'s state machine (ApertureScience17 SWF). UI-agnostic:
- * [liveLine]/[exitRequested] are plain [StateFlow]s, never calls `exitProcess()`. */
+/**
+ * Faithful port of `DoAction.as`'s state machine (ApertureScience17 SWF). UI-agnostic:
+ * [liveLine]/[exitRequested] are plain [StateFlow]s, never calls `exitProcess()`.
+ */
 class TerminalEngine(
     private val instantReveal: Boolean = false,
     initialState: EngineState? = null,
@@ -27,18 +29,24 @@ class TerminalEngine(
 
     private val _annotations = MutableStateFlow<List<TextAnnotation>>(emptyList())
 
-    /** Tagged spans over [liveLine] (e.g. [BLINK_TAG]) - live counterpart to
-     * [EngineState.annotations], published as soon as a span finishes revealing. */
+    /**
+     * Tagged spans over [liveLine] (e.g. [BLINK_TAG]) - live counterpart to
+     * [EngineState.annotations], published as soon as a span finishes revealing.
+     */
     val annotations: StateFlow<List<TextAnnotation>> = _annotations.asStateFlow()
 
     private val _exitRequested = MutableStateFlow(false)
 
-    /** True once the session should end (LOGOUT/PLAY PORTAL). */
+    /**
+     * True once the session should end (LOGOUT/PLAY PORTAL).
+     */
     val exitRequested: StateFlow<Boolean> = _exitRequested.asStateFlow()
 
     private lateinit var scope: CoroutineScope
 
-    /** Every mutable field, held as one value - every transition reassigns via `.copy(...)`. */
+    /**
+     * Every mutable field, held as one value - every transition reassigns via `.copy(...)`.
+     */
     private var state: EngineState =
         initialState ?: EngineState(
             mode = Mode.Login.Initial,
@@ -70,14 +78,18 @@ class TerminalEngine(
         }
     }
 
-    /** Column width future [reveal]-wrapped lines are hard-wrapped to - not a cap; callers who
-     * want [WRAP_WIDTH] as an upper bound apply `minOf(columns, WRAP_WIDTH)` themselves. */
+    /**
+     * Column width future [reveal]-wrapped lines are hard-wrapped to - not a cap; callers who
+     * want [WRAP_WIDTH] as an upper bound apply `minOf(columns, WRAP_WIDTH)` themselves.
+     */
     fun setViewportWidth(columns: Int) {
         if (columns > 0) state = state.copy(wrapWidth = columns)
     }
 
-    /** Snapshots state for a host that can't keep this instance alive between turns (e.g. a
-     * stateless HTTP session) - see [EngineState] and the batch API below. */
+    /**
+     * Snapshots state for a host that can't keep this instance alive between turns (e.g. a
+     * stateless HTTP session) - see [EngineState] and the batch API below.
+     */
     fun captureState(): EngineState = state
 
     fun boot(coroutineScope: CoroutineScope) {
@@ -93,21 +105,27 @@ class TerminalEngine(
     // Synchronous "batch" API for stateless hosts (e.g. a request/response Minitel service):
     // runs a whole turn to completion via instantReveal, never touching `scope`.
 
-    /** [boot]'s synchronous equivalent - only meaningful on a freshly-constructed engine. */
+    /**
+     * [boot]'s synchronous equivalent - only meaningful on a freshly-constructed engine.
+     */
     suspend fun bootTurn(): String {
         bootBody()
         return liveLine.value
     }
 
-    /** Submits [line] as a whole already-validated line, the batch-API equivalent of typing it
-     * via [onKeyEvent] then pressing Enter. */
+    /**
+     * Submits [line] as a whole already-validated line, the batch-API equivalent of typing it
+     * via [onKeyEvent] then pressing Enter.
+     */
     suspend fun submitLine(line: String): String {
         setInputLine(line)
         handleEnter()
         return liveLine.value
     }
 
-    /** The "any accepted key" equivalent [onKeyEvent] uses for NOTES/CAKE/BOSSKEY. */
+    /**
+     * The "any accepted key" equivalent [onKeyEvent] uses for NOTES/CAKE/BOSSKEY.
+     */
     suspend fun advance(): String {
         when (state.mode) {
             Mode.Cake, Mode.BossKey -> toggleCakeBosskey()
@@ -116,7 +134,9 @@ class TerminalEngine(
         return liveLine.value
     }
 
-    /** [handlePaging]'s synchronous equivalent (Q21's own >[PAGE_SIZE]-choice pagination). */
+    /**
+     * [handlePaging]'s synchronous equivalent (Q21's own >[PAGE_SIZE]-choice pagination).
+     */
     suspend fun page(delta: Int): String {
         handlePagingBody(delta)
         return liveLine.value
@@ -196,7 +216,9 @@ class TerminalEngine(
         scope.launch { handlePagingBody(delta) }
     }
 
-    /** Whole-line equivalent of [onKeyEvent]'s per-character filtering. */
+    /**
+     * Whole-line equivalent of [onKeyEvent]'s per-character filtering.
+     */
     private fun setInputLine(line: String) {
         val filtered =
             buildString {
@@ -478,7 +500,9 @@ class TerminalEngine(
 
     // shared helpers
 
-    /** Accept/reject branch at the bottom of processInput0/processInput2. */
+    /**
+     * Accept/reject branch at the bottom of processInput0/processInput2.
+     */
     private suspend fun finishTurn(advance: Boolean) {
         if (advance) {
             showNextPage()
@@ -488,8 +512,10 @@ class TerminalEngine(
         }
     }
 
-    /** Clears and redraws for [state]'s mode - already the exact target screen by the time this
-     * runs, so there's no index math left to do here (mirrors switchPage()). */
+    /**
+     * Clears and redraws for [state]'s mode - already the exact target screen by the time this
+     * runs, so there's no index math left to do here (mirrors switchPage()).
+     */
     private suspend fun showNextPage() {
         clearScreen()
         state = state.copy(input = "")
@@ -548,8 +574,10 @@ class TerminalEngine(
         showNextPage()
     }
 
-    /** Ends the session in place of the original's browser navigation (LOGOUT/PLAY PORTAL),
-     * which a terminal can't perform - shown as an in-universe terminal error instead. */
+    /**
+     * Ends the session in place of the original's browser navigation (LOGOUT/PLAY PORTAL),
+     * which a terminal can't perform - shown as an in-universe terminal error instead.
+     */
     private suspend fun farewell(errorMessage: String) {
         clearScreen()
         reveal("\n[$errorMessage]\n", GLADOS_SPEED)
@@ -557,17 +585,21 @@ class TerminalEngine(
         _exitRequested.value = true
     }
 
-    /** Every wall-clock suspension goes through here, so [instantReveal] hosts get zero-cost
-     * content while [boot]/[onKeyEvent] hosts keep real timing. */
+    /**
+     * Every wall-clock suspension goes through here, so [instantReveal] hosts get zero-cost
+     * content while [boot]/[onKeyEvent] hosts keep real timing.
+     */
     private suspend fun maybeDelay(ms: Long) {
         if (!instantReveal) {
             delay(ms.milliseconds)
         }
     }
 
-    /** Types [text] out one character at a time onto [EngineState.pageContent]. `^` becomes a
+    /**
+     * Types [text] out one character at a time onto [EngineState.pageContent]. `^` becomes a
      * newline, `@` the uid (wrapped in [BLINK_START]/[BLINK_END], see [markAnnotationEnd]),
-     * word-wrapped to [EngineState.wrapWidth]. delayMs <= 0 reveals instantly. */
+     * word-wrapped to [EngineState.wrapWidth]. delayMs <= 0 reveals instantly.
+     */
     private suspend fun reveal(
         text: String,
         delayMs: Int,
@@ -605,9 +637,11 @@ class TerminalEngine(
         }
     }
 
-    /** Publishes a [TextAnnotation] the instant a marked span finishes revealing - not deferred
+    /**
+     * Publishes a [TextAnnotation] the instant a marked span finishes revealing - not deferred
      * to the end of the whole [reveal] call, so a still-typing trailing paragraph doesn't delay
-     * e.g. blink onset. */
+     * e.g. blink onset.
+     */
     private fun markAnnotationEnd(
         tag: String,
         start: Int,
@@ -617,7 +651,9 @@ class TerminalEngine(
         _annotations.value = state.annotations
     }
 
-    /** Reveals every line instantly, appending onto [EngineState.pageContent] (see [reveal]). */
+    /**
+     * Reveals every line instantly, appending onto [EngineState.pageContent] (see [reveal]).
+     */
     private suspend fun revealInstant(text: String) = reveal(text, 0)
 
     private fun wordWrap(
@@ -650,18 +686,22 @@ class TerminalEngine(
         return result
     }
 
-    /** [BLINK_START]/[BLINK_END] carry no visible width - wrap decisions go by what actually
-     * occupies a column, not raw [CharSequence.length]. */
+    /**
+     * [BLINK_START]/[BLINK_END] carry no visible width - wrap decisions go by what actually
+     * occupies a column, not raw [CharSequence.length].
+     */
     private fun visibleLength(s: CharSequence): Int {
         var count = 0
         for (c in s) if (c != BLINK_START && c != BLINK_END) count++
         return count
     }
 
-    /** [wordWrap]'s hard-cut path, marker-aware: splits [s] at exactly [width] visible
+    /**
+     * [wordWrap]'s hard-cut path, marker-aware: splits [s] at exactly [width] visible
      * characters, keeping any [BLINK_START]/[BLINK_END] interleaved within the head intact and in
      * order. A marker landing right at the cut boundary stays attached to the head, so it can
-     * never end up alone as an all-invisible trailing "line". */
+     * never end up alone as an all-invisible trailing "line".
+     */
     private fun splitAtVisibleWidth(
         s: String,
         width: Int,
@@ -676,8 +716,10 @@ class TerminalEngine(
         return s.substring(0, i) to s.substring(i)
     }
 
-    /** Which `loginFlowScreens`/`loginFlowScreenDelays` entry each [Mode.Login] state reveals -
-     * a rendering detail local to [showNextPage]. */
+    /**
+     * Which `loginFlowScreens`/`loginFlowScreenDelays` entry each [Mode.Login] state reveals -
+     * a rendering detail local to [showNextPage].
+     */
     private val Mode.Login.loginFlowScreenIndex: Int
         get() =
             when (this) {
@@ -696,23 +738,31 @@ class TerminalEngine(
         private const val NOTES_SPEED = 3
         private const val MAX_INPUT_LENGTH = 65
 
-        /** Q21's own >[PAGE_SIZE]-choice pagination size - public so a host knows what delta to
-         * pass to [page]. */
+        /**
+         * Q21's own >[PAGE_SIZE]-choice pagination size - public so a host knows what delta to
+         * pass to [page].
+         */
         const val PAGE_SIZE = 104
 
-        /** Default wrap width, matching the original's pixel-width auto-wrap threshold. */
+        /**
+         * Default wrap width, matching the original's pixel-width auto-wrap threshold.
+         */
         const val WRAP_WIDTH = 100
         private const val MAX_NOTES_PAGE = 4
 
-        /** Never appear in real content (control chars) - mark the start/end of a [reveal]d span
-         * that should carry a [TextAnnotation], stripped from [EngineState.pageContent] itself. */
+        /**
+         * Never appear in real content (control chars) - mark the start/end of a [reveal]d span
+         * that should carry a [TextAnnotation], stripped from [EngineState.pageContent] itself.
+         */
         private const val BLINK_START = '\u0002' // STX
         private const val BLINK_END = '\u0003' // ETX
 
-        /** Keys [onKeyEvent] treats specially, as opposed to a single printable character (see
+        /**
+         * Keys [onKeyEvent] treats specially, as opposed to a single printable character (see
          * [isAcceptedChar]) - the one place mapping the raw platform key-name string (both
          * `ui-terminal`'s Mosaic and `ui-web`'s DOM `KeyboardEvent.key` already agree on these
-         * names) to a definite set the engine understands, instead of scattering string literals. */
+         * names) to a definite set the engine understands, instead of scattering string literals.
+         */
         private enum class NamedKey(
             val keyName: String,
         ) {
@@ -730,16 +780,20 @@ class TerminalEngine(
             }
         }
 
-        /** Public re-export of [NamedKey]'s recognized key-name strings, so a host that needs to
+        /**
+         * Public re-export of [NamedKey]'s recognized key-name strings, so a host that needs to
          * pre-filter which keys are worth forwarding to [onKeyEvent] (e.g. `ui-web`, which ignores
          * anything unrecognized before it ever reaches the engine) shares one source of truth
-         * instead of maintaining its own separate copy. */
+         * instead of maintaining its own separate copy.
+         */
         val NAMED_KEYS: Set<String> = NamedKey.entries.map { it.keyName }.toSet()
 
-        /** Every keyword [dispatchLogin]/[dispatchShell]/[dispatchApplication] recognize - named
+        /**
+         * Every keyword [dispatchLogin]/[dispatchShell]/[dispatchApplication] recognize - named
          * so a typo can't silently create an unreachable branch, and so aliases of the same
          * command (e.g. [DIR]/[CATALOG]/[DIRECTORY]) are visibly related instead of just five
-         * independent string literals. */
+         * independent string literals.
+         */
         private object Command {
             const val LOGON = "LOGON"
             const val LOGIN = "LOGIN"

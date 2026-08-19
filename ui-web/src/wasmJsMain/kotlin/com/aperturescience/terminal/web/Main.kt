@@ -14,8 +14,10 @@ import org.w3c.dom.HTMLPreElement
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
 
-/** Web counterpart to `ui-terminal`'s `App.kt`/`AppRunner.kt`: no shared UI layer (Mosaic has no
- * Wasm target), so this drives [TerminalEngine] directly against the DOM instead. */
+/**
+ * Web counterpart to `ui-terminal`'s `App.kt`/`AppRunner.kt`: no shared UI layer (Mosaic has no
+ * Wasm target), so this drives [TerminalEngine] directly against the DOM instead.
+ */
 fun main() {
     val engine = TerminalEngine()
     val scope = CoroutineScope(Job())
@@ -50,10 +52,12 @@ fun main() {
     engine.boot(scope)
 }
 
-/** Plain [line] when there's nothing to blink; otherwise rebuilds [screen]'s children around a
+/**
+ * Plain [line] when there's nothing to blink; otherwise rebuilds [screen]'s children around a
  * `<span class="blink-text">` wrapping [blinkRange]. Phase-locked to the cursor's own blink
  * entirely via CSS (both read the same inherited `--blink-opacity`, see styles.css) - a span
- * created mid-session is in sync from its very first frame, no JS timing math needed. */
+ * created mid-session is in sync from its very first frame, no JS timing math needed.
+ */
 private fun renderScreen(
     screen: HTMLPreElement,
     line: String,
@@ -80,8 +84,10 @@ private const val UNWRAPPED_WIDTH = Int.MAX_VALUE
 // Shares TerminalEngine's own list instead of a separately-maintained copy, so this can't drift.
 private val NAMED_KEYS = TerminalEngine.NAMED_KEYS
 
-/** Forwards plain keystrokes to [TerminalEngine.onKeyEvent]. Ctrl/Cmd/Alt combos are left alone
- * so browser/OS shortcuts (copy, devtools, refresh) keep working. */
+/**
+ * Forwards plain keystrokes to [TerminalEngine.onKeyEvent]. Ctrl/Cmd/Alt combos are left alone
+ * so browser/OS shortcuts (copy, devtools, refresh) keep working.
+ */
 private fun handleKeyDown(
     event: KeyboardEvent,
     engine: TerminalEngine,

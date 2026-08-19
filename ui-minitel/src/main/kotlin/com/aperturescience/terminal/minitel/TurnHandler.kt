@@ -10,8 +10,10 @@ import fr.outadoc.minipavi.core.model.ServiceResponse
 import fr.outadoc.minipavi.videotex.VideotexBuilder
 import fr.outadoc.minipavi.videotex.buildVideotex
 
-/** Drives one MiniPavi gateway call to completion, bridging its one-line-in/one-frame-out model
- * onto `TerminalEngine`'s turn API. Not yet exercised against a live gateway. */
+/**
+ * Drives one MiniPavi gateway call to completion, bridging its one-line-in/one-frame-out model
+ * onto `TerminalEngine`'s turn API. Not yet exercised against a live gateway.
+ */
 suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceResponse<MinitelSessionState> {
     val state = request.state
 
@@ -101,8 +103,10 @@ private fun isQ21PaginationActive(mode: Mode): Boolean {
 
 private fun isPasswordPrompt(mode: Mode): Boolean = mode is Mode.Login.Password
 
-/** Chunks [engine]'s current output, renders [chunkIndex]'s slice as one Vidéotex frame, and
- * persists everything needed to resume on the next call. */
+/**
+ * Chunks [engine]'s current output, renders [chunkIndex]'s slice as one Vidéotex frame, and
+ * persists everything needed to resume on the next call.
+ */
 private fun render(
     engine: TerminalEngine,
     chunkIndex: Int,
@@ -156,9 +160,11 @@ internal data class LineBlinkSplit(
     val after: String,
 )
 
-/** Splits one rendered [line] (starting at [lineStart] in the full pageContent) around wherever
+/**
+ * Splits one rendered [line] (starting at [lineStart] in the full pageContent) around wherever
  * [blinkRange] intersects it, if at all. Kept independent of [VideotexBuilder] so the offset math
- * is testable without decoding Vidéotex escape bytes. */
+ * is testable without decoding Vidéotex escape bytes.
+ */
 internal fun splitLineForBlink(
     line: String,
     lineStart: Int,
