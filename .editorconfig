@@ -11,6 +11,3 @@ ktlint_function_naming_ignore_when_annotated_with = Composable
 # scripts/gen_kotlin_data.py - regenerated, not hand-formatted, so ktlint's rules don't apply.
 [**/generated/**]
 ktlint = disabled
-
-[**/data/TerminalData.kt]
-ktlint = disabled
