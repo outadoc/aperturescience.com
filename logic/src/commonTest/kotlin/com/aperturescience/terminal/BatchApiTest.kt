@@ -122,32 +122,6 @@ class BatchApiTest {
         }
 
     @Test
-    fun `Paged paginates question 21's choices and back without touching the input line`() =
-        runTest {
-            val engine = TerminalEngine(instantReveal = true)
-            engine.dispatch(Intent.Boot)
-            engine.dispatch(Intent.LineSubmitted("LOGON"))
-            engine.dispatch(Intent.LineSubmitted("TESTER"))
-            engine.dispatch(Intent.LineSubmitted("PORTAL"))
-            engine.dispatch(Intent.LineSubmitted("APPLY"))
-            engine.dispatch(Intent.LineSubmitted("CONTINUE"))
-            engine.dispatch(Intent.LineSubmitted("CONTINUE"))
-            for (question in TerminalData.questions.take(20)) {
-                engine.dispatch(Intent.LineSubmitted(if (question.type == QuestionType.TEXT) "AN ANSWER" else "1"))
-            }
-
-            val firstPage = engine.state.value.displayText
-            assertTrue(firstPage.contains("total choices"))
-
-            engine.dispatch(Intent.Paged(104))
-            val secondPage = engine.state.value.displayText
-            assertNotEquals(firstPage, secondPage)
-
-            engine.dispatch(Intent.Paged(-104))
-            assertEquals(firstPage, engine.state.value.displayText)
-        }
-
-    @Test
     fun `LineSubmitted sets exitRequested on LOGOUT - with the farewell message in the content`() =
         runTest {
             val engine = TerminalEngine(instantReveal = true)

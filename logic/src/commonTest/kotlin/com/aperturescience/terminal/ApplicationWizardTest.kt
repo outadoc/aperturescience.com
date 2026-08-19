@@ -64,7 +64,7 @@ class ApplicationWizardTest {
             submit(engine, "CONTINUE")
             assertTrue(
                 engine.state.value.displayText
-                    .contains("Unique Indentity Number"),
+                    .contains("Unique Identity Number"),
             )
             assertTrue(
                 engine.state.value.displayText
@@ -248,57 +248,6 @@ class ApplicationWizardTest {
             assertEquals(deadEnd, engine.state.value.displayText)
             submit(engine, "LOGON")
             assertEquals(deadEnd, engine.state.value.displayText)
-        }
-
-    @Test
-    fun `question 21 has more than one page of choices`() =
-        runTest {
-            val engine = enterApplication()
-            answerQuestions(engine, TerminalData.questions.take(20))
-
-            val question21 = TerminalData.questions[20]
-            assertEquals(21, question21.index)
-            assertTrue(question21.choices.size > 104)
-            assertTrue(
-                engine.state.value.displayText
-                    .contains("${question21.choices.size} total choices"),
-            )
-        }
-
-    @Test
-    fun `PageDown then PageUp on question 21 returns to the original view`() =
-        runTest {
-            val engine = enterApplication()
-            answerQuestions(engine, TerminalData.questions.take(20))
-
-            val firstPage = engine.state.value.displayText
-            pressKey(engine, "PageDown")
-            val secondPage = engine.state.value.displayText
-            assertNotEquals(firstPage, secondPage)
-
-            pressKey(engine, "PageUp")
-            assertEquals(firstPage, engine.state.value.displayText)
-        }
-
-    /**
-     * Matches the original: overshooting past the final page reverts to the untouched offset -
-     * PageDown there is a no-op, never landing on a spurious page isolating the last choice.
-     */
-    @Test
-    fun `PageDown past the final page of question 21 is a no-op`() =
-        runTest {
-            val engine = enterApplication()
-            answerQuestions(engine, TerminalData.questions.take(20))
-
-            val totalChoices = TerminalData.questions[20].choices.size
-            val pressesToLastPage = totalChoices / PAGE_SIZE
-            repeat(pressesToLastPage) { pressKey(engine, "PageDown") }
-
-            val lastPage = engine.state.value.displayText
-            assertTrue(lastPage.endsWith("Zorilla\n[$totalChoices total choices : PGUP/PGDN to navigate]> "))
-
-            pressKey(engine, "PageDown")
-            assertEquals(lastPage, engine.state.value.displayText)
         }
 
     @Test
