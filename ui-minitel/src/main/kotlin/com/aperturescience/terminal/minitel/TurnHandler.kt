@@ -130,6 +130,7 @@ private fun render(
                 col = inputCol,
                 line = inputLine,
                 length = inputLength,
+                spaceChar = " ",
                 substituteChar = if (isPasswordPrompt(state.mode)) "*" else "",
                 submitWith = setOf(FunctionKey.Envoi, FunctionKey.Suite, FunctionKey.Retour),
             )
