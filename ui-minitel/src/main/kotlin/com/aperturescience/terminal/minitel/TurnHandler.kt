@@ -35,8 +35,15 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
         return render(engine, chunkIndex = 0)
     }
 
-    val engine = TerminalEngine(instantReveal = true, initialState = state.toEngineState())
-    engine.dispatch(Intent.ViewportResized(ScreenChunker.WRAP_WIDTH))
+    val engine =
+        TerminalEngine(
+            instantReveal = true,
+            initialState = state.toEngineState(),
+        )
+
+    engine.dispatch(
+        Intent.ViewportResized(ScreenChunker.WRAP_WIDTH),
+    )
 
     val chunksBefore = ScreenChunker.chunk(engine.state.value.displayText)
     val lastChunkIndex = chunksBefore.lastIndex
@@ -127,6 +134,7 @@ private fun render(
             val inputCol = (lastLine.length + 1).coerceAtMost(ScreenChunker.COLUMNS)
             val inputLine = lines.size.coerceIn(1, ScreenChunker.ROWS_PER_SCREEN)
             val inputLength = (ScreenChunker.COLUMNS - lastLine.length).coerceAtLeast(1)
+
             ServiceResponse.Command.InputText(
                 col = inputCol,
                 line = inputLine,
@@ -140,7 +148,12 @@ private fun render(
         }
 
     return ServiceResponse(
-        state = MinitelSessionState.from(state, chunkIndex = safeIndex, pendingDisconnect = pendingDisconnect),
+        state =
+            MinitelSessionState.from(
+                engineState = state,
+                chunkIndex = safeIndex,
+                pendingDisconnect = pendingDisconnect,
+            ),
         content = content,
         command = command,
     )
@@ -162,13 +175,20 @@ internal fun splitLineForBlink(
     lineStart: Int,
     blinkRange: IntRange?,
 ): LineBlinkSplit {
-    if (blinkRange == null) return LineBlinkSplit(line, "", "")
+    if (blinkRange == null) {
+        return LineBlinkSplit(line, "", "")
+    }
+
     val lineEndExclusive = lineStart + line.length
     val start = maxOf(blinkRange.first, lineStart)
     val endExclusive = minOf(blinkRange.last + 1, lineEndExclusive)
-    if (start >= endExclusive) return LineBlinkSplit(line, "", "")
+    if (start >= endExclusive) {
+        return LineBlinkSplit(line, "", "")
+    }
+
     val localStart = start - lineStart
     val localEnd = endExclusive - lineStart
+
     return LineBlinkSplit(
         before = line.substring(0, localStart),
         blinking = line.substring(localStart, localEnd),
@@ -183,6 +203,10 @@ private fun VideotexBuilder.appendLineWithBlink(
 ) {
     val split = splitLineForBlink(line, lineStart, blinkRange)
     append(split.before)
-    if (split.blinking.isNotEmpty()) withBlink { append(split.blinking) }
+    if (split.blinking.isNotEmpty()) {
+        withBlink {
+            append(split.blinking)
+        }
+    }
     appendLine(split.after)
 }
