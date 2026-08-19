@@ -1,8 +1,5 @@
 package com.aperturescience.terminal
 
-import com.aperturescience.terminal.TerminalReducer.Command.CATALOG
-import com.aperturescience.terminal.TerminalReducer.Command.DIR
-import com.aperturescience.terminal.TerminalReducer.Command.DIRECTORY
 import com.aperturescience.terminal.TerminalReducer.gladosPrompt
 import com.aperturescience.terminal.TerminalReducer.reduceApplication
 import com.aperturescience.terminal.TerminalReducer.reduceKeyPressed
@@ -54,7 +51,13 @@ object TerminalReducer {
             }
 
             is Intent.ViewportResized -> {
-                Reduction(if (intent.columns > 0) state.copy(wrapWidth = intent.columns) else state)
+                Reduction(
+                    if (intent.columns > 0) {
+                        state.copy(wrapWidth = intent.columns)
+                    } else {
+                        state
+                    },
+                )
             }
 
             is Intent.CharacterRevealed -> {
@@ -76,7 +79,11 @@ object TerminalReducer {
     ): Reduction =
         when (char) {
             BLINK_START -> {
-                Reduction(state.copy(pendingAnnotationStart = state.pageContent.length))
+                Reduction(
+                    state.copy(
+                        pendingAnnotationStart = state.pageContent.length,
+                    ),
+                )
             }
 
             BLINK_END -> {
@@ -87,7 +94,11 @@ object TerminalReducer {
                     } else {
                         state.copy(
                             annotations =
-                                state.annotations + TextAnnotation(BLINK_TAG, start until state.pageContent.length),
+                                state.annotations +
+                                    TextAnnotation(
+                                        tag = BLINK_TAG,
+                                        range = start until state.pageContent.length,
+                                    ),
                             pendingAnnotationStart = null,
                         )
                     },
@@ -95,7 +106,11 @@ object TerminalReducer {
             }
 
             else -> {
-                Reduction(state.copy(pageContent = state.pageContent + char))
+                Reduction(
+                    state.copy(
+                        pageContent = state.pageContent + char,
+                    ),
+                )
             }
         }
 
@@ -108,12 +123,20 @@ object TerminalReducer {
 
         // Cake/bosskey: any accepted key toggles between the two screens, no line input at all.
         if (state.mode == Mode.Cake || state.mode == Mode.BossKey) {
-            return if (isAcceptedRawKey(namedKey, key)) reduceAdvanced(state) else Reduction(state)
+            return if (isAcceptedRawKey(namedKey, key)) {
+                reduceAdvanced(state)
+            } else {
+                Reduction(state)
+            }
         }
 
         // NOTES.EXE forces every keystroke to behave like Enter.
         if (state.mode is Mode.Notes) {
-            return if (isAcceptedRawKey(namedKey, key)) commitEnter(state) else Reduction(state)
+            return if (isAcceptedRawKey(namedKey, key)) {
+                commitEnter(state)
+            } else {
+                Reduction(state)
+            }
         }
 
         return when {
@@ -123,7 +146,11 @@ object TerminalReducer {
 
             namedKey == NamedKey.BACKSPACE -> {
                 if (state.input.isNotEmpty()) {
-                    Reduction(state.copy(input = state.input.dropLast(1)))
+                    Reduction(
+                        state.copy(
+                            input = state.input.dropLast(1),
+                        ),
+                    )
                 } else {
                     Reduction(state)
                 }
@@ -132,7 +159,11 @@ object TerminalReducer {
             key.length == 1 -> {
                 val c = key[0]
                 if (isAcceptedChar(c) && state.input.length < MAX_INPUT_LENGTH) {
-                    Reduction(state.copy(input = state.input + c.uppercaseChar()))
+                    Reduction(
+                        state.copy(
+                            input = state.input + c.uppercaseChar(),
+                        ),
+                    )
                 } else {
                     Reduction(state)
                 }
@@ -159,7 +190,9 @@ object TerminalReducer {
                     }
                 }
             }
-        return commitEnter(state.copy(input = filtered))
+        return commitEnter(
+            state.copy(input = filtered),
+        )
     }
 
     /**
@@ -167,24 +200,43 @@ object TerminalReducer {
      */
     private fun reduceAdvanced(state: EngineState): Reduction =
         when (state.mode) {
-            Mode.Cake, Mode.BossKey -> toggleCakeBosskey(state)
-            else -> commitEnter(state)
+            Mode.Cake,
+            Mode.BossKey,
+            -> {
+                toggleCakeBosskey(state)
+            }
+
+            else -> {
+                commitEnter(state)
+            }
         }
 
     private fun commitEnter(state: EngineState): Reduction {
         val locked = state.copy(isLocked = true)
         val submitted = locked.input
         return when (val current = locked.mode) {
-            is Mode.Login -> reduceLogin(locked, current, submitted)
+            is Mode.Login -> {
+                reduceLogin(locked, current, submitted)
+            }
 
-            is Mode.Shell -> reduceShell(locked, submitted)
+            is Mode.Shell -> {
+                reduceShell(locked, submitted)
+            }
 
-            is Mode.Application -> reduceApplication(locked, current, submitted)
+            is Mode.Application -> {
+                reduceApplication(locked, current, submitted)
+            }
 
-            is Mode.Notes -> reduceNotes(locked, current)
+            is Mode.Notes -> {
+                reduceNotes(locked, current)
+            }
 
             // Cake/bosskey's any-key handling goes through reduceAdvanced/toggleCakeBosskey, not here.
-            Mode.Cake, Mode.BossKey -> Reduction(locked)
+            Mode.Cake,
+            Mode.BossKey,
+            -> {
+                Reduction(locked)
+            }
         }
     }
 
@@ -211,26 +263,46 @@ object TerminalReducer {
             // Reading help then typing anything follows the same rules as the initial prompt.
             Mode.Login.Help -> {
                 advance = text == Command.LOGON || text == Command.LOGIN || text == Command.USER
-                if (advance) next = next.copy(mode = Mode.Login.Username)
+                if (advance) {
+                    next =
+                        next.copy(
+                            mode = Mode.Login.Username,
+                        )
+                }
                 if (text == Command.HELP || text == Command.QUESTION_MARK) {
                     advance = true
-                    next = next.copy(mode = Mode.Login.Help)
+                    next =
+                        next.copy(
+                            mode = Mode.Login.Help,
+                        )
                 }
             }
 
             Mode.Login.Username -> {
                 advance = text.length > 2
                 next = next.copy(isAdmin = text == Command.CJOHNSON)
-                if (advance) next = next.copy(mode = Mode.Login.Password(isRetry = false))
+                if (advance) {
+                    next =
+                        next.copy(
+                            mode =
+                                Mode.Login.Password(
+                                    isRetry = false,
+                                ),
+                        )
+                }
             }
 
             is Mode.Login.Password -> {
                 if (next.isAdmin) {
                     advance = text == Command.TIER3
-                    next = next.copy(isAdmin = advance)
+                    next =
+                        next.copy(
+                            isAdmin = advance,
+                        )
                 } else {
                     advance = text == Command.PORTAL || text == Command.PORTALS
                 }
+
                 // Always advances - a wrong password redisplays with an error, not a block.
                 next =
                     next.copy(
@@ -239,7 +311,9 @@ object TerminalReducer {
                                 Mode.Shell()
                             } else {
                                 advance = true
-                                Mode.Login.Password(isRetry = true)
+                                Mode.Login.Password(
+                                    isRetry = true,
+                                )
                             },
                     )
             }
@@ -247,27 +321,47 @@ object TerminalReducer {
             Mode.Login.ApplicationIntro -> {
                 if (text == Command.CONTINUE) {
                     advance = true
-                    next = next.copy(mode = Mode.Login.ApplicationUidDisplay)
+                    next =
+                        next.copy(
+                            mode = Mode.Login.ApplicationUidDisplay,
+                        )
                 }
                 if (text == Command.QUIT) {
                     advance = true
-                    next = next.copy(mode = Mode.Shell())
+                    next =
+                        next.copy(
+                            mode = Mode.Shell(),
+                        )
                 }
             }
 
             Mode.Login.ApplicationUidDisplay -> {
                 if (text == Command.CONTINUE) {
                     advance = true
-                    next = next.copy(mode = Mode.Application(questionNumber = 1))
+                    next =
+                        next.copy(
+                            mode = Mode.Application(questionNumber = 1),
+                        )
                 }
                 if (text == Command.QUIT) {
                     advance = true
-                    next = next.copy(mode = Mode.Shell())
+                    next =
+                        next.copy(
+                            mode = Mode.Shell(),
+                        )
                 }
             }
 
             Mode.Login.UinEntry -> {
-                next = next.copy(mode = if (text == Command.THECAKEISALIE) Mode.Cake else Mode.Login.Terminal)
+                next =
+                    next.copy(
+                        mode =
+                            if (text == Command.THECAKEISALIE) {
+                                Mode.Cake
+                            } else {
+                                Mode.Login.Terminal
+                            },
+                    )
                 advance = true
             }
 
@@ -310,17 +404,40 @@ object TerminalReducer {
             -> {
                 message =
                     if (state.isAdmin) {
-                        "\n\nDISK VOLUME 255 [WORKSTATION CJOHNSON]\n\n" +
-                            "     I  019  APPLY.EXE\n     I  004  NOTES.EXE\n\n" +
-                            "2 FILE(S) IN 23 BLOCKS\n\n"
+                        """
+                        
+                        
+                        DISK VOLUME 255 [WORKSTATION CJOHNSON]
+                        
+                             I  019  APPLY.EXE
+                             I  004  NOTES.EXE
+                        
+                        2 FILE(S) IN 23 BLOCKS
+                        
+                        """.trimIndent()
                     } else {
-                        "\n\nDISK VOLUME 255 [NEW EMPLOYEE WORKSTATION]\n\n" +
-                            "     I  019  APPLY.EXE\n\n1 FILE(S) IN 19 BLOCKS\n\n"
+                        """
+                        
+                        
+                        DISK VOLUME 255 [NEW EMPLOYEE WORKSTATION]
+                        
+                             I  019  APPLY.EXE
+                        
+                        1 FILE(S) IN 19 BLOCKS
+                        
+                        """.trimIndent()
                     }
             }
 
             Command.IP -> {
-                message = " \n\nuid:${state.uid}\n"
+                message =
+                    buildString {
+                        appendLine()
+                        appendLine()
+                        append(" uid:")
+                        append(state.uid)
+                        appendLine()
+                    }
             }
 
             Command.HELP,
@@ -329,11 +446,40 @@ object TerminalReducer {
             -> {
                 message =
                     if (state.isAdmin) {
-                        " \n\nLIB\n     NOTES\n     APPEND\n     ATTRIB\n     COPY\n     DIR\n     ERASE\n" +
-                            "     FORMAT\n     INTERROGATE\n     LIB\n     PLAY\n     RENAME\n     TAPEDISK"
+                        """
+                        
+                        
+                        LIB
+                             NOTES
+                             APPEND
+                             ATTRIB
+                             COPY
+                             DIR
+                             ERASE
+                             FORMAT
+                             INTERROGATE
+                             LIB
+                             PLAY
+                             RENAME
+                             TAPEDISK
+                        """.trimIndent()
                     } else {
-                        " \n\nLIB\n     APPEND\n     ATTRIB\n     COPY\n     DIR\n     ERASE\n     FORMAT\n" +
-                            "     INTERROGATE\n     LIB\n     PLAY\n     RENAME\n     TAPEDISK"
+                        """
+                        
+                        
+                        LIB
+                             APPEND
+                             ATTRIB
+                             COPY
+                             DIR
+                             ERASE
+                             FORMAT
+                             INTERROGATE
+                             LIB
+                             PLAY
+                             RENAME
+                             TAPEDISK
+                        """.trimIndent()
                     }
             }
 
@@ -342,7 +488,10 @@ object TerminalReducer {
             Command.LOGOFF,
             Command.VALVE,
             -> {
-                return farewell(state, "ERROR: STORE NOT FOUND")
+                return farewell(
+                    state = state,
+                    errorMessage = "ERROR: STORE NOT FOUND",
+                )
             }
 
             Command.APPEND,
@@ -352,32 +501,56 @@ object TerminalReducer {
             Command.ERASE,
             Command.RENAME,
             -> {
-                message = "\n\nERROR 15 [Disk is write protected]"
+                message =
+                    buildString {
+                        appendLine()
+                        appendLine()
+                        append("ERROR 15 [Disk is write protected]")
+                    }
             }
 
             Command.PLAY -> {
                 when {
                     args.size == 1 -> {
-                        message = "\n\nERROR 03 [What would you like to play?]"
+                        message =
+                            buildString {
+                                appendLine()
+                                appendLine()
+                                append("ERROR 03 [What would you like to play?]")
+                            }
                     }
 
                     args.getOrNull(1) == Command.PORTAL -> {
-                        return farewell(state, "ERROR: TRAILER NOT FOUND")
+                        return farewell(
+                            state = state,
+                            errorMessage = "ERROR: TRAILER NOT FOUND",
+                        )
                     }
                 }
             }
 
             Command.INTERROGATE -> {
                 message =
-                    when {
-                        args.size == 1 -> "\n\nERROR 02 [Command requires at least one parameter]"
-                        state.isAdmin -> "\n\nERROR 07 [Unknown Employee]"
-                        else -> "\n\nERROR 01 [Illegal attempt to initiate disciplinary action]"
+                    buildString {
+                        appendLine()
+                        appendLine()
+                        append(
+                            when {
+                                args.size == 1 -> "ERROR 02 [Command requires at least one parameter]"
+                                state.isAdmin -> "ERROR 07 [Unknown Employee]"
+                                else -> "ERROR 01 [Illegal attempt to initiate disciplinary action]"
+                            },
+                        )
                     }
             }
 
             Command.TAPEDISK -> {
-                message = "\n\nERROR 18 [User not authorized to transfer system tapes]"
+                message =
+                    buildString {
+                        appendLine()
+                        appendLine()
+                        append("ERROR 18 [User not authorized to transfer system tapes]")
+                    }
             }
 
             Command.NOTES,
@@ -386,7 +559,14 @@ object TerminalReducer {
                 if (state.isAdmin) {
                     next = state.copy(mode = Mode.Notes(page = 1))
                 } else {
-                    message = "\n\nERROR 24 [File '${args[0]}' not found]"
+                    message =
+                        buildString {
+                            appendLine()
+                            appendLine()
+                            append("ERROR 24 [File '")
+                            append(args[0])
+                            append("' not found]")
+                        }
                 }
             }
 
@@ -397,14 +577,25 @@ object TerminalReducer {
             }
 
             else -> {
-                message = "\n\nERROR 24 [File '${args[0]}' not found]"
+                message =
+                    buildString {
+                        appendLine()
+                        appendLine()
+                        append("ERROR 24 [File '")
+                        append(args[0])
+                        append("' not found]")
+                    }
             }
         }
 
         // Skip if a branch above already switched screens (Cake/Notes/Apply).
         if (next.mode is Mode.Shell) {
-            next = next.copy(mode = Mode.Shell(message = message))
+            next =
+                next.copy(
+                    mode = Mode.Shell(message = message),
+                )
         }
+
         return showNextPage(next)
     }
 
@@ -418,7 +609,11 @@ object TerminalReducer {
     ): Reduction {
         // Off-by-one: reaching the question count ends the form without validating the last answer.
         if (current.questionNumber >= TerminalData.questions.size) {
-            return showNextPage(state.copy(mode = Mode.Login.UinEntry))
+            return showNextPage(
+                state.copy(
+                    mode = Mode.Login.UinEntry,
+                ),
+            )
         }
 
         val question = TerminalData.questions[current.questionNumber - 1]
@@ -444,7 +639,13 @@ object TerminalReducer {
                 current
             }
 
-        return finishTurn(state.copy(mode = nextMode), advance)
+        return finishTurn(
+            state =
+                state.copy(
+                    mode = nextMode,
+                ),
+            advance = advance,
+        )
     }
 
     /**
@@ -455,14 +656,30 @@ object TerminalReducer {
         current: Mode.Notes,
     ): Reduction {
         val nextPage = current.page + 1
-        val next = state.copy(mode = if (nextPage > MAX_NOTES_PAGE) Mode.Shell() else Mode.Notes(page = nextPage))
-        return showNextPage(next)
+
+        return showNextPage(
+            state.copy(
+                mode =
+                    if (nextPage > MAX_NOTES_PAGE) {
+                        Mode.Shell()
+                    } else {
+                        Mode.Notes(page = nextPage)
+                    },
+            ),
+        )
     }
 
-    private fun toggleCakeBosskey(state: EngineState): Reduction {
-        val next = state.copy(mode = if (state.mode == Mode.Cake) Mode.BossKey else Mode.Cake)
-        return showNextPage(next)
-    }
+    private fun toggleCakeBosskey(state: EngineState): Reduction =
+        showNextPage(
+            state.copy(
+                mode =
+                    if (state.mode == Mode.Cake) {
+                        Mode.BossKey
+                    } else {
+                        Mode.Cake
+                    },
+            ),
+        )
 
     /**
      * Ends the session in place of the original's browser navigation (LOGOUT/PLAY PORTAL),
@@ -474,16 +691,20 @@ object TerminalReducer {
     ): Reduction {
         val cleared = state.copy(pageContent = "", annotations = emptyList())
         return Reduction(
-            cleared,
-            listOf(
-                revealEffect(
-                    state = cleared,
-                    text = "\n[$errorMessage]\n",
-                    delayMs = GLADOS_SPEED,
-                    unlock = true,
+            state = cleared,
+            effects =
+                listOf(
+                    revealEffect(
+                        state = cleared,
+                        text = "\n[$errorMessage]\n",
+                        delayMs = GLADOS_SPEED,
+                        unlock = true,
+                    ),
+                    Effect.Wait(
+                        ms = 400,
+                        thenDispatch = Intent.ExitRequested,
+                    ),
                 ),
-                Effect.Wait(400, thenDispatch = Intent.ExitRequested),
-            ),
         )
     }
 
@@ -577,9 +798,9 @@ object TerminalReducer {
                 is Mode.Notes -> {
                     listOf(
                         revealEffect(
-                            cleared,
-                            TerminalData.notesHistoryPages[current.page - 1],
-                            NOTES_SPEED,
+                            state = cleared,
+                            text = TerminalData.notesHistoryPages[current.page - 1],
+                            delayMs = NOTES_SPEED,
                             unlock = true,
                         ),
                     )
@@ -659,9 +880,14 @@ object TerminalReducer {
         unlock: Boolean,
     ): Effect.RevealCharacters =
         Effect.RevealCharacters(
-            buildRevealChars(text, state.uid, state.wrapWidth),
-            delayMs,
-            thenDispatch = if (unlock) Intent.Unlocked else null,
+            chars = buildRevealChars(text, state.uid, state.wrapWidth),
+            delayMs = delayMs,
+            thenDispatch =
+                if (unlock) {
+                    Intent.Unlocked
+                } else {
+                    null
+                },
         )
 
     /**
@@ -675,7 +901,12 @@ object TerminalReducer {
             "GLaDOS v1.07 (c) 1982 Aperture Science, Inc."
         }
 
-    private fun gladosPrompt(state: EngineState): String = if (state.isAdmin) "^^ADMIN> " else " ^^B:\\> "
+    private fun gladosPrompt(state: EngineState): String =
+        if (state.isAdmin) {
+            "^^ADMIN> "
+        } else {
+            "^^B:\\> "
+        }
 
     /**
      * Which `loginFlowScreens`/`loginFlowScreenDelays` entry each [Mode.Login] state reveals -
@@ -684,19 +915,19 @@ object TerminalReducer {
     private val Mode.Login.loginFlowScreenIndex: Int
         get() =
             when (this) {
-                Mode.Login.Initial -> 0
-                Mode.Login.Username -> 1
+                is Mode.Login.Initial -> 0
+                is Mode.Login.Username -> 1
                 is Mode.Login.Password -> if (isRetry) 3 else 2
-                Mode.Login.ApplicationIntro -> 4
-                Mode.Login.ApplicationUidDisplay -> 5
-                Mode.Login.Help -> 8
-                Mode.Login.UinEntry -> 9
-                Mode.Login.Terminal -> 10
+                is Mode.Login.ApplicationIntro -> 4
+                is Mode.Login.ApplicationUidDisplay -> 5
+                is Mode.Login.Help -> 8
+                is Mode.Login.UinEntry -> 9
+                is Mode.Login.Terminal -> 10
             }
 
     /**
      * Every keyword [reduceLogin]/[reduceShell]/[reduceApplication] recognize, so aliases of the
-     * same command (e.g. [DIR]/[CATALOG]/[DIRECTORY]) are visibly related, not scattered literals.
+     * same command (e.g. [Command.DIR]/[Command.CATALOG]/[Command.DIRECTORY]) are visibly related, not scattered literals.
      */
     private object Command {
         const val LOGON = "LOGON"

@@ -1,7 +1,5 @@
 package com.aperturescience.terminal
 
-import com.aperturescience.terminal.data.QuestionType
-import com.aperturescience.terminal.data.TerminalData
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
