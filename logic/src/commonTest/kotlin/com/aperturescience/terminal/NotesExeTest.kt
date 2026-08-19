@@ -47,6 +47,19 @@ class NotesExeTest {
         }
 
     @Test
+    fun `PageUp PageDown and ArrowLeft also advance a page`() =
+        runTest {
+            for (key in listOf("PageUp", "PageDown", "ArrowLeft")) {
+                val engine = loginAsAdmin()
+                submit(engine, "NOTES")
+                val firstPage = engine.liveLine.value
+
+                pressKey(engine, key)
+                assertTrue(engine.liveLine.value != firstPage, "expected '$key' to advance a page")
+            }
+        }
+
+    @Test
     fun `an unaccepted key does nothing while reading NOTES-EXE`() =
         runTest {
             val engine = loginAsAdmin()

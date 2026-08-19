@@ -56,6 +56,19 @@ class CakeBossKeyTest {
         }
 
     @Test
+    fun `PageUp PageDown and ArrowLeft also toggle the cake-bosskey loop`() =
+        runTest {
+            for (key in listOf("PageUp", "PageDown", "ArrowLeft")) {
+                val engine = loginToShell()
+                submit(engine, "THECAKEISALIE")
+                val cakeScreen = engine.liveLine.value
+
+                pressKey(engine, key)
+                assertNotEquals(cakeScreen, engine.liveLine.value, "expected '$key' to toggle the loop")
+            }
+        }
+
+    @Test
     fun `an unaccepted key does not toggle the cake-bosskey loop`() =
         runTest {
             val engine = loginToShell()

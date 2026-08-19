@@ -670,6 +670,9 @@ class TerminalEngine(
         private fun isAcceptedRawKey(key: String): Boolean =
             key == "Enter" ||
                 key == "Backspace" ||
+                key == "PageUp" ||
+                key == "PageDown" ||
+                key == "ArrowLeft" ||
                 key == " " ||
                 (key.length == 1 && isAcceptedChar(key[0]))
 
