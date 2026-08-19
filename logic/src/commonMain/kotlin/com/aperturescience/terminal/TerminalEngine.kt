@@ -1,7 +1,10 @@
 package com.aperturescience.terminal
 
+import com.aperturescience.terminal.TerminalEngine.Companion.BLINK_END
+import com.aperturescience.terminal.TerminalEngine.Companion.BLINK_START
 import com.aperturescience.terminal.TerminalEngine.Companion.PAGE_SIZE
 import com.aperturescience.terminal.TerminalEngine.Companion.WRAP_WIDTH
+import com.aperturescience.terminal.TerminalEngine.Companion.isAcceptedChar
 import com.aperturescience.terminal.data.QuestionType
 import com.aperturescience.terminal.data.TerminalData
 import kotlinx.coroutines.CoroutineScope
@@ -228,18 +231,18 @@ class TerminalEngine(
         var advance = false
         when (current) {
             Mode.Login.Initial -> {
-                advance = text == "LOGON" || text == "LOGIN" || text == "USER"
+                advance = text == Command.LOGON || text == Command.LOGIN || text == Command.USER
                 if (advance) state = state.copy(mode = Mode.Login.Username)
-                if (text == "HELP" || text == "?") {
+                if (text == Command.HELP || text == Command.QUESTION_MARK) {
                     advance = true
                     state = state.copy(mode = Mode.Login.Help)
                 }
             }
             // Reading help then typing anything follows the same rules as the initial prompt.
             Mode.Login.Help -> {
-                advance = text == "LOGON" || text == "LOGIN" || text == "USER"
+                advance = text == Command.LOGON || text == Command.LOGIN || text == Command.USER
                 if (advance) state = state.copy(mode = Mode.Login.Username)
-                if (text == "HELP" || text == "?") {
+                if (text == Command.HELP || text == Command.QUESTION_MARK) {
                     advance = true
                     state = state.copy(mode = Mode.Login.Help)
                 }
@@ -247,16 +250,16 @@ class TerminalEngine(
 
             Mode.Login.Username -> {
                 advance = text.length > 2
-                state = state.copy(isAdmin = text == "CJOHNSON")
+                state = state.copy(isAdmin = text == Command.CJOHNSON)
                 if (advance) state = state.copy(mode = Mode.Login.Password(isRetry = false))
             }
 
             is Mode.Login.Password -> {
                 if (state.isAdmin) {
-                    advance = text == "TIER3"
+                    advance = text == Command.TIER3
                     state = state.copy(isAdmin = advance)
                 } else {
-                    advance = text == "PORTAL" || text == "PORTALS"
+                    advance = text == Command.PORTAL || text == Command.PORTALS
                 }
                 // Always advances - a wrong password redisplays with an error, not a block.
                 state =
@@ -272,29 +275,29 @@ class TerminalEngine(
             }
 
             Mode.Login.ApplicationIntro -> {
-                if (text == "CONTINUE") {
+                if (text == Command.CONTINUE) {
                     advance = true
                     state = state.copy(mode = Mode.Login.ApplicationUidDisplay)
                 }
-                if (text == "QUIT") {
+                if (text == Command.QUIT) {
                     advance = true
                     state = state.copy(mode = Mode.Shell())
                 }
             }
 
             Mode.Login.ApplicationUidDisplay -> {
-                if (text == "CONTINUE") {
+                if (text == Command.CONTINUE) {
                     advance = true
                     state = state.copy(mode = Mode.Application(questionNumber = 1))
                 }
-                if (text == "QUIT") {
+                if (text == Command.QUIT) {
                     advance = true
                     state = state.copy(mode = Mode.Shell())
                 }
             }
 
             Mode.Login.UinEntry -> {
-                state = state.copy(mode = if (text == "THECAKEISALIE") Mode.Cake else Mode.Login.Terminal)
+                state = state.copy(mode = if (text == Command.THECAKEISALIE) Mode.Cake else Mode.Login.Terminal)
                 advance = true
             }
             // Dead end - there is no way back from here.
@@ -313,12 +316,21 @@ class TerminalEngine(
             state = state.copy(isLocked = false)
             return
         }
-        val args = text.split(" ")
+
+        val args: List<String> = text.split(" ")
         var message = ""
         when (args[0]) {
-            "THECAKEISALIE" -> state = state.copy(mode = Mode.Cake)
+            Command.THECAKEISALIE -> {
+                state = state.copy(mode = Mode.Cake)
+            }
 
-            "DIR", "CATALOG", "DIRECTORY", "LIST", "LS", "CAT" -> {
+            Command.DIR,
+            Command.CATALOG,
+            Command.DIRECTORY,
+            Command.LIST,
+            Command.LS,
+            Command.CAT,
+                -> {
                 message =
                     if (state.isAdmin) {
                         "\n\nDISK VOLUME 255 [WORKSTATION CJOHNSON]\n\n" +
@@ -330,9 +342,14 @@ class TerminalEngine(
                     }
             }
 
-            "IP" -> message = " \n\nuid:${state.uid}\n"
+            Command.IP -> {
+                message = " \n\nuid:${state.uid}\n"
+            }
 
-            "HELP", "LIB", "?" -> {
+            Command.HELP,
+            Command.LIB,
+            Command.QUESTION_MARK,
+                -> {
                 message =
                     if (state.isAdmin) {
                         " \n\nLIB\n     NOTES\n     APPEND\n     ATTRIB\n     COPY\n     DIR\n     ERASE\n" +
@@ -343,34 +360,51 @@ class TerminalEngine(
                     }
             }
 
-            "LOGOUT", "BYE", "LOGOFF", "VALVE" -> {
+            Command.LOGOUT,
+            Command.BYE,
+            Command.LOGOFF,
+            Command.VALVE,
+                -> {
                 farewell("ERROR: STORE NOT FOUND")
                 return
             }
 
-            "APPEND", "ATTRIB", "COPY", "FORMAT", "ERASE", "RENAME" ->
+            Command.APPEND,
+            Command.ATTRIB,
+            Command.COPY,
+            Command.FORMAT,
+            Command.ERASE,
+            Command.RENAME,
+                -> {
                 message = "\n\nERROR 15 [Disk is write protected]"
+            }
 
-            "PLAY" ->
+            Command.PLAY -> {
                 when {
                     args.size == 1 -> message = "\n\nERROR 03 [What would you like to play?]"
-                    args.getOrNull(1) == "PORTAL" -> {
+                    args.getOrNull(1) == Command.PORTAL -> {
                         farewell("ERROR: TRAILER NOT FOUND")
                         return
                     }
                 }
+            }
 
-            "INTERROGATE" ->
+            Command.INTERROGATE -> {
                 message =
                     when {
                         args.size == 1 -> "\n\nERROR 02 [Command requires at least one parameter]"
                         state.isAdmin -> "\n\nERROR 07 [Unknown Employee]"
                         else -> "\n\nERROR 01 [Illegal attempt to initiate disciplinary action]"
                     }
+            }
 
-            "TAPEDISK" -> message = "\n\nERROR 18 [User not authorized to transfer system tapes]"
+            Command.TAPEDISK -> {
+                message = "\n\nERROR 18 [User not authorized to transfer system tapes]"
+            }
 
-            "NOTES", "NOTES.EXE" -> {
+            Command.NOTES,
+            Command.NOTES_EXE,
+                -> {
                 if (state.isAdmin) {
                     state = state.copy(mode = Mode.Notes(page = 1))
                 } else {
@@ -378,9 +412,15 @@ class TerminalEngine(
                 }
             }
 
-            "APPLY", "APPLY.EXE" -> state = state.copy(mode = Mode.Login.ApplicationIntro)
+            Command.APPLY,
+            Command.APPLY_EXE,
+                -> {
+                state = state.copy(mode = Mode.Login.ApplicationIntro)
+            }
 
-            else -> message = "\n\nERROR 24 [File '${args[0]}' not found]"
+            else -> {
+                message = "\n\nERROR 24 [File '${args[0]}' not found]"
+            }
         }
 
         // Skip if a branch above already switched screens (Cake/Notes/Apply).
@@ -416,7 +456,7 @@ class TerminalEngine(
         state =
             state.copy(
                 mode =
-                    if (text == "QUIT") {
+                    if (text == Command.QUIT) {
                         advance = true
                         Mode.Shell()
                     } else if (advance) {
@@ -684,6 +724,56 @@ class TerminalEngine(
 
                 fun from(key: String): NamedKey? = byName[key]
             }
+        }
+
+        /** Public re-export of [NamedKey]'s recognized key-name strings, so a host that needs to
+         * pre-filter which keys are worth forwarding to [onKeyEvent] (e.g. `ui-web`, which ignores
+         * anything unrecognized before it ever reaches the engine) shares one source of truth
+         * instead of maintaining its own separate copy. */
+        val NAMED_KEYS: Set<String> = NamedKey.entries.map { it.keyName }.toSet()
+
+        /** Every keyword [dispatchLogin]/[dispatchShell]/[dispatchApplication] recognize - named
+         * so a typo can't silently create an unreachable branch, and so aliases of the same
+         * command (e.g. [DIR]/[CATALOG]/[DIRECTORY]) are visibly related instead of just five
+         * independent string literals. */
+        private object Command {
+            const val LOGON = "LOGON"
+            const val LOGIN = "LOGIN"
+            const val USER = "USER"
+            const val HELP = "HELP"
+            const val QUESTION_MARK = "?"
+            const val LIB = "LIB"
+            const val CJOHNSON = "CJOHNSON"
+            const val TIER3 = "TIER3"
+            const val PORTAL = "PORTAL"
+            const val PORTALS = "PORTALS"
+            const val CONTINUE = "CONTINUE"
+            const val QUIT = "QUIT"
+            const val THECAKEISALIE = "THECAKEISALIE"
+            const val DIR = "DIR"
+            const val CATALOG = "CATALOG"
+            const val DIRECTORY = "DIRECTORY"
+            const val LIST = "LIST"
+            const val LS = "LS"
+            const val CAT = "CAT"
+            const val IP = "IP"
+            const val LOGOUT = "LOGOUT"
+            const val BYE = "BYE"
+            const val LOGOFF = "LOGOFF"
+            const val VALVE = "VALVE"
+            const val APPEND = "APPEND"
+            const val ATTRIB = "ATTRIB"
+            const val COPY = "COPY"
+            const val FORMAT = "FORMAT"
+            const val ERASE = "ERASE"
+            const val RENAME = "RENAME"
+            const val PLAY = "PLAY"
+            const val INTERROGATE = "INTERROGATE"
+            const val TAPEDISK = "TAPEDISK"
+            const val NOTES = "NOTES"
+            const val NOTES_EXE = "NOTES.EXE"
+            const val APPLY = "APPLY"
+            const val APPLY_EXE = "APPLY.EXE"
         }
 
         private fun isAcceptedChar(c: Char): Boolean =

@@ -77,7 +77,8 @@ private const val TERMINAL_ELEMENT_ID = "terminal"
 // Larger than any real line - just enough to keep TerminalEngine.wordWrap from ever triggering.
 private const val UNWRAPPED_WIDTH = Int.MAX_VALUE
 
-private val NAMED_KEYS = setOf("Enter", "Backspace", "PageUp", "PageDown", "ArrowLeft")
+// Shares TerminalEngine's own list instead of a separately-maintained copy, so this can't drift.
+private val NAMED_KEYS = TerminalEngine.NAMED_KEYS
 
 /** Forwards plain keystrokes to [TerminalEngine.onKeyEvent]. Ctrl/Cmd/Alt combos are left alone
  * so browser/OS shortcuts (copy, devtools, refresh) keep working. */
