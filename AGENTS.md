@@ -49,11 +49,13 @@ screen. All logic and text lives in a single ~4300-line AS2 script
 - `scripts/parse_as_data.py` — parses the literal `questions[]`, `cjhistory[]`,
   `qar[]`, `qdelay[]` array assignments out of `DoAction.as` into
   `decompiled/terminal_data.json`. Regenerate this if re-exporting the SWF.
-- `scripts/gen_kotlin_data.py` — generates
-  `cli/logic/src/commonMain/kotlin/com/aperturescience/terminal/data/TerminalData.kt`
-  from that JSON (verbatim string literals, escaped for Kotlin). This file
-  is committed as a generated artifact — do not hand-edit it, rerun the
-  script instead.
+- `scripts/gen_kotlin_data.py` — one-time import: generated the initial
+  `logic/src/commonMain/kotlin/com/aperturescience/terminal/data/TerminalData.kt`
+  from that JSON (verbatim string literals, escaped for Kotlin). `TerminalData.kt`
+  is no longer treated as a generated artifact and is hand-maintained directly
+  from here on - its variable names (`loginFlowScreens`, `loginFlowScreenDelays`,
+  `notesHistoryPages`) have since diverged from the AS-derived `qar`/`qdelay`/
+  `cjhistory` names still used by this script and `terminal_data.json`.
 - `cli/` — the Kotlin reimplementation (Gradle, Kotlin Multiplatform: `jvm()`,
   `linuxX64()`, and `wasmJs()` targets, version catalog at
   `cli/gradle/libs.versions.toml`). Four modules: `cli/logic/` (the whole

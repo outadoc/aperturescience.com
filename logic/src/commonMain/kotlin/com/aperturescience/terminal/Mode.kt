@@ -53,7 +53,7 @@ sealed interface Mode {
     ) : Mode
 
     /** NOTES.EXE (processInput5), admin-only - [page] is 1-indexed, matching
-     * [TerminalData.cjHistory]. */
+     * [TerminalData.notesHistoryPages]. */
     data class Notes(
         val page: Int,
     ) : Mode

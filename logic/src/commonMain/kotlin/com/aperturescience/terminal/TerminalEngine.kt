@@ -87,7 +87,7 @@ class TerminalEngine(
 
     private suspend fun bootBody() {
         clearScreen()
-        reveal(TerminalData.qar[0], TerminalData.qdelay[0])
+        reveal(TerminalData.loginFlowScreens[0], TerminalData.loginFlowScreenDelays[0])
     }
 
     // Synchronous "batch" API for stateless hosts (e.g. a request/response Minitel service):
@@ -330,7 +330,7 @@ class TerminalEngine(
             Command.LIST,
             Command.LS,
             Command.CAT,
-                -> {
+            -> {
                 message =
                     if (state.isAdmin) {
                         "\n\nDISK VOLUME 255 [WORKSTATION CJOHNSON]\n\n" +
@@ -349,7 +349,7 @@ class TerminalEngine(
             Command.HELP,
             Command.LIB,
             Command.QUESTION_MARK,
-                -> {
+            -> {
                 message =
                     if (state.isAdmin) {
                         " \n\nLIB\n     NOTES\n     APPEND\n     ATTRIB\n     COPY\n     DIR\n     ERASE\n" +
@@ -364,7 +364,7 @@ class TerminalEngine(
             Command.BYE,
             Command.LOGOFF,
             Command.VALVE,
-                -> {
+            -> {
                 farewell("ERROR: STORE NOT FOUND")
                 return
             }
@@ -375,7 +375,7 @@ class TerminalEngine(
             Command.FORMAT,
             Command.ERASE,
             Command.RENAME,
-                -> {
+            -> {
                 message = "\n\nERROR 15 [Disk is write protected]"
             }
 
@@ -404,7 +404,7 @@ class TerminalEngine(
 
             Command.NOTES,
             Command.NOTES_EXE,
-                -> {
+            -> {
                 if (state.isAdmin) {
                     state = state.copy(mode = Mode.Notes(page = 1))
                 } else {
@@ -414,7 +414,7 @@ class TerminalEngine(
 
             Command.APPLY,
             Command.APPLY_EXE,
-                -> {
+            -> {
                 state = state.copy(mode = Mode.Login.ApplicationIntro)
             }
 
@@ -494,7 +494,11 @@ class TerminalEngine(
         clearScreen()
         state = state.copy(input = "")
         when (val current = state.mode) {
-            is Mode.Login -> reveal(TerminalData.qar[current.qarIndex], TerminalData.qdelay[current.qarIndex])
+            is Mode.Login ->
+                reveal(
+                    TerminalData.loginFlowScreens[current.loginFlowScreenIndex],
+                    TerminalData.loginFlowScreenDelays[current.loginFlowScreenIndex],
+                )
             is Mode.Shell -> reveal(gladosHeader + current.message + gladosPrompt, GLADOS_SPEED)
             is Mode.Application -> showQuestion()
             Mode.BossKey -> revealInstant(BOSSKEY_SPREADSHEET)
@@ -503,8 +507,8 @@ class TerminalEngine(
                 maybeDelay(2000) // stand-in for security02.flv playback
                 reveal(CAKE_MONOLOGUE_2, 0)
             }
-            // cjHistory already ends in "[MORE]"/"[END]" - nothing appended here.
-            is Mode.Notes -> reveal(TerminalData.cjHistory[current.page - 1], NOTES_SPEED)
+            // notesHistoryPages already ends in "[MORE]"/"[END]" - nothing appended here.
+            is Mode.Notes -> reveal(TerminalData.notesHistoryPages[current.page - 1], NOTES_SPEED)
         }
     }
 
@@ -672,9 +676,9 @@ class TerminalEngine(
         return s.substring(0, i) to s.substring(i)
     }
 
-    /** Which qar/qdelay entry each [Mode.Login] state reveals - a rendering detail local to
-     * [showNextPage]. */
-    private val Mode.Login.qarIndex: Int
+    /** Which `loginFlowScreens`/`loginFlowScreenDelays` entry each [Mode.Login] state reveals -
+     * a rendering detail local to [showNextPage]. */
+    private val Mode.Login.loginFlowScreenIndex: Int
         get() =
             when (this) {
                 Mode.Login.Initial -> 0

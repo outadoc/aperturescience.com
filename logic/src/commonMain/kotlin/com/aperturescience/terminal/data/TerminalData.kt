@@ -1,7 +1,5 @@
-// GENERATED FILE — do not edit by hand.
-// Source data extracted verbatim from the decompiled ActionScript
-// (DoAction.as) of ApertureScience17 (2007-10-17).swf via
-// scripts/gen_kotlin_data.py (from repo root). Regenerate rather than hand-edit.
+// Screen text, question list, and timing data ported verbatim from the decompiled ActionScript
+// (DoAction.as) of ApertureScience17 (2007-10-17).swf - see reference/decompiled/.
 package com.aperturescience.terminal.data
 
 enum class QuestionType { TEXT, CHECKBOX, RADIO }
@@ -14,8 +12,9 @@ data class Question(
 )
 
 object TerminalData {
-    /** Login / application-flow prompt banners, indexed by qon (0..11). */
-    val qar: List<String> = listOf(
+    /** Login/application-flow screen text - indexed by `TerminalEngine`'s per-`Mode.Login`
+     * screen index (0..11). */
+    val loginFlowScreens: List<String> = listOf(
         "> ",
         "Username> ",
         "Password> ",
@@ -30,13 +29,13 @@ object TerminalData {
         "... > ^ >^ ^When was the last time you left the building? Do you know anyone who's left the building lately? I don't know what lunatic wrote the new lockdown policy. I don't know who's in charge. But they're building an 'Enrichment Center'. Check out this security feed. Whatever the hell a 'relaxation vault' is, it doesn't have any doors. ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^If a supervisor walks by, press return. I don't think going home is part of our job description anymore. ^ ",
     )
 
-    /** Typewriter delay in ms/char, parallel to [qar]. */
-    val qdelay: List<Int> = listOf(
+    /** Typewriter delay in ms/char, parallel to [loginFlowScreens]. */
+    val loginFlowScreenDelays: List<Int> = listOf(
         75, 75, 75, 25, 5, 10, 50, 10, 10, 10, 10, 5
     )
 
     /** CJOHNSON-only NOTES.EXE history pages (1..4). */
-    val cjHistory: List<String> = listOf(
+    val notesHistoryPages: List<String> = listOf(
         "1953 - Aperture Science begins operations as a manufacturer of shower curtains. Early product line provides a very low-tech portal between the inside and outside of your shower. Very little science is actually involved. The name is chosen to make the curtains appear more hygienic.^^1956 - Eisenhower administration awards Aperture a contract to provide shower curtains to all branches of the military except the Navy.^^1957 - 1975 - Mostly shower curtains.^^1978 - Aperture Founder and CEO, Cave Johnson, is exposed to mercury while secretly developing a dangerous mercury-injected rubber sheeting from which he plans to manufacture seven deadly shower curtains to be given as gifts to each member of the House Naval Appropriations committee.^^^[MORE]",
         "1979 - Both of Cave Johnson's kidneys fail. Brain damaged, dying, and incapable of being convinced that time is not now flowing backwards, Johnson lays out a three tiered R&D program. The results, he says, will 'guarantee the continued success of Aperture Science far into the fast-approaching distant past.'^^Tier 1: The Heimlich Counter-Maneuver - A reliable technique for interrupting the life-saving Heimlich Maneuver.^^Tier 2: The Take-A-Wish Foundation - A charitable organization that will purchase wishes from the parents of terminally ill children and redistribute them to wish-deprived but otherwise healthy adults.^^Tier 3: 'Some kind of rip in the fabric of space… That would… Well, it'd be like, I don't know, something that would help with the shower curtains I guess. I haven't worked this idea out as much as the wish-taking one.'^^^[MORE]",
         "1981 - Diligent Aperture engineers complete the Heimlich Counter-Maneuver and Take-A-Wish Foundation initiatives.  The company announces products related to the research in a lavish, televised ceremony. These products become immediately wildly unpopular.  After a string of very public choking and despondent sick child disasters, senior company officials are summoned before a Senate investigative committee. During these proceedings, an engineer mentions that some progress has been made on Tier 3, the 'man-sized ad hoc quantum tunnel through physical space with possible applications as a shower curtain.' The committee is quickly permanently recessed, and Aperture is granted an open-ended contract to secretly continue research on the 'Portal' and Heimlich Counter-Maneuver projects.^^^[MORE]",

@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class NotesExeTest {
     @Test
     fun `NOTES-EXE has exactly four history pages available`() {
-        assertEquals(4, TerminalData.cjHistory.size)
+        assertEquals(4, TerminalData.notesHistoryPages.size)
     }
 
     @Test
