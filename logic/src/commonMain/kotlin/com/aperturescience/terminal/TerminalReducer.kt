@@ -10,12 +10,6 @@ import com.aperturescience.terminal.data.QuestionType
 import com.aperturescience.terminal.data.TerminalData
 
 /**
- * Q21's own >[PAGE_SIZE]-choice pagination size - public so a host knows what delta to pass to
- * [Intent.Paged].
- */
-const val PAGE_SIZE = 104
-
-/**
  * Default wrap width, matching the original's pixel-width auto-wrap threshold.
  */
 const val WRAP_WIDTH = 100
@@ -39,11 +33,17 @@ object TerminalReducer {
             }
 
             is Intent.KeyPressed -> {
-                reduceKeyPressed(state, intent.key)
+                reduceKeyPressed(
+                    state = state,
+                    key = intent.key,
+                )
             }
 
             is Intent.LineSubmitted -> {
-                reduceLineSubmitted(state, intent.line)
+                reduceLineSubmitted(
+                    state = state,
+                    line = intent.line,
+                )
             }
 
             Intent.Advanced -> {
@@ -53,7 +53,9 @@ object TerminalReducer {
             is Intent.ViewportResized -> {
                 Reduction(
                     if (intent.columns > 0) {
-                        state.copy(wrapWidth = intent.columns)
+                        state.copy(
+                            wrapWidth = intent.columns,
+                        )
                     } else {
                         state
                     },
@@ -61,15 +63,26 @@ object TerminalReducer {
             }
 
             is Intent.CharacterRevealed -> {
-                reduceCharacterRevealed(state, intent.char)
+                reduceCharacterRevealed(
+                    state = state,
+                    char = intent.char,
+                )
             }
 
             Intent.Unlocked -> {
-                Reduction(state.copy(isLocked = false))
+                Reduction(
+                    state.copy(
+                        isLocked = false,
+                    ),
+                )
             }
 
             Intent.ExitRequested -> {
-                Reduction(state.copy(exitRequested = true))
+                Reduction(
+                    state.copy(
+                        exitRequested = true,
+                    ),
+                )
             }
         }
 
@@ -190,8 +203,11 @@ object TerminalReducer {
                     }
                 }
             }
+
         return commitEnter(
-            state.copy(input = filtered),
+            state.copy(
+                input = filtered,
+            ),
         )
     }
 
@@ -216,19 +232,33 @@ object TerminalReducer {
         val submitted = locked.input
         return when (val current = locked.mode) {
             is Mode.Login -> {
-                reduceLogin(locked, current, submitted)
+                reduceLogin(
+                    state = locked,
+                    current = current,
+                    text = submitted,
+                )
             }
 
             is Mode.Shell -> {
-                reduceShell(locked, submitted)
+                reduceShell(
+                    state = locked,
+                    rawText = submitted,
+                )
             }
 
             is Mode.Application -> {
-                reduceApplication(locked, current, submitted)
+                reduceApplication(
+                    state = locked,
+                    current = current,
+                    text = submitted,
+                )
             }
 
             is Mode.Notes -> {
-                reduceNotes(locked, current)
+                reduceNotes(
+                    state = locked,
+                    current = current,
+                )
             }
 
             // Cake/bosskey's any-key handling goes through reduceAdvanced/toggleCakeBosskey, not here.
@@ -253,10 +283,19 @@ object TerminalReducer {
         when (current) {
             Mode.Login.Initial -> {
                 advance = text == Command.LOGON || text == Command.LOGIN || text == Command.USER
-                if (advance) next = next.copy(mode = Mode.Login.Username)
+                if (advance) {
+                    next =
+                        next.copy(
+                            mode = Mode.Login.Username,
+                        )
+                }
+
                 if (text == Command.HELP || text == Command.QUESTION_MARK) {
                     advance = true
-                    next = next.copy(mode = Mode.Login.Help)
+                    next =
+                        next.copy(
+                            mode = Mode.Login.Help,
+                        )
                 }
             }
 
@@ -269,6 +308,7 @@ object TerminalReducer {
                             mode = Mode.Login.Username,
                         )
                 }
+
                 if (text == Command.HELP || text == Command.QUESTION_MARK) {
                     advance = true
                     next =
@@ -280,7 +320,11 @@ object TerminalReducer {
 
             Mode.Login.Username -> {
                 advance = text.length > 2
-                next = next.copy(isAdmin = text == Command.CJOHNSON)
+                next =
+                    next.copy(
+                        isAdmin = text == Command.CJOHNSON,
+                    )
+
                 if (advance) {
                     next =
                         next.copy(
@@ -536,9 +580,17 @@ object TerminalReducer {
                         appendLine()
                         append(
                             when {
-                                args.size == 1 -> "ERROR 02 [Command requires at least one parameter]"
-                                state.isAdmin -> "ERROR 07 [Unknown Employee]"
-                                else -> "ERROR 01 [Illegal attempt to initiate disciplinary action]"
+                                args.size == 1 -> {
+                                    "ERROR 02 [Command requires at least one parameter]"
+                                }
+
+                                state.isAdmin -> {
+                                    "ERROR 07 [Unknown Employee]"
+                                }
+
+                                else -> {
+                                    "ERROR 01 [Illegal attempt to initiate disciplinary action]"
+                                }
                             },
                         )
                     }
