@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 class MinitelSessionStateTest {
     private val sampleEngineState =
         EngineState(
-            mode = Mode.Application(questionNumber = 21, pageOffset = 104),
+            mode = Mode.Application(questionNumber = 21),
             isAdmin = true,
             uid = "ABCDEF012345",
             pageContent = "Form FORMS-EN-2873-FORM - Page 21\n\nsome question text\n\n001] a\n002] b\n> ",
@@ -41,11 +41,13 @@ class MinitelSessionStateTest {
     }
 
     @Test
-    fun `initial is a placeholder with a fresh chunk index and no pending disconnect`() {
+    fun `initial is a real booted state - not a half-valid placeholder`() {
         val initial = MinitelSessionState.initial()
         assertEquals(0, initial.chunkIndex)
         assertEquals(false, initial.pendingDisconnect)
-        assertEquals(true, initial.isLocked)
+        assertEquals(false, initial.isLocked)
+        assertEquals("> ", initial.pageContent)
+        assertTrue(initial.uid.isNotEmpty())
     }
 
     @Test

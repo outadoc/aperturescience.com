@@ -1,6 +1,9 @@
 package com.aperturescience.terminal.minitel
 
 import com.aperturescience.terminal.EngineState
+import com.aperturescience.terminal.Intent
+import com.aperturescience.terminal.TerminalEngine
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 
 /**
@@ -54,18 +57,20 @@ data class MinitelSessionState(
             }
 
         /**
-         * Placeholder for `minitelService`'s `initialState` param - never actually rendered,
-         * since [TurnHandler] builds a fresh `TerminalEngine` for every new session instead.
+         * `minitelService`'s `initialState` param - used whenever the gateway sends a request
+         * with no (or unparseable) context, which isn't guaranteed to line up with a
+         * [fr.outadoc.minipavi.core.model.GatewayRequest.Event.Connection] event, so this has to
+         * be a real booted state, not a half-valid placeholder.
          */
         fun initial(): MinitelSessionState =
-            MinitelSessionState(
-                mode = MinitelMode.Login.Initial,
-                isAdmin = false,
-                uid = "",
-                pageContent = "",
-                input = "",
-                wrapWidth = ScreenChunker.WRAP_WIDTH,
-                isLocked = true,
+            from(
+                engineState =
+                    runBlocking {
+                        val engine = TerminalEngine(instantReveal = true)
+                        engine.dispatch(Intent.ViewportResized(ScreenChunker.WRAP_WIDTH))
+                        engine.dispatch(Intent.Boot)
+                        engine.state.value
+                    },
             )
     }
 }
