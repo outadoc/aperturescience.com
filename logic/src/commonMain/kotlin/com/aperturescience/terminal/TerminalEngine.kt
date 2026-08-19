@@ -175,7 +175,12 @@ class TerminalEngine(
         val current = state.mode as? Mode.Application ?: return
         val choices = TerminalData.questions[current.questionNumber - 1].choices
         if (choices.size <= PAGE_SIZE) return
-        val next = (current.pageOffset + delta).coerceIn(0, choices.size - 1)
+        // Matches the original: overshooting past the end reverts to the untouched offset rather
+        // than clamping to the last index, so a PageDown past the final (already-complete) page
+        // is a no-op instead of landing on a spurious page showing only the last item alone.
+        var next = current.pageOffset + delta
+        if (next < 0) next = 0
+        if (next > choices.size) next = current.pageOffset
         if (next != current.pageOffset) {
             state = state.copy(mode = current.copy(pageOffset = next), isLocked = true)
             clearScreen()

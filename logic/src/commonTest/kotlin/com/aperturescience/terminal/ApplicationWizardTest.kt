@@ -228,6 +228,25 @@ class ApplicationWizardTest {
             assertEquals(firstPage, engine.liveLine.value)
         }
 
+    /** Matches the original: overshooting past the final page reverts to the untouched offset -
+     * PageDown there is a no-op, never landing on a spurious page isolating the last choice. */
+    @Test
+    fun `PageDown past the final page of question 21 is a no-op`() =
+        runTest {
+            val engine = enterApplication()
+            answerQuestions(engine, TerminalData.questions.take(20))
+
+            val totalChoices = TerminalData.questions[20].choices.size
+            val pressesToLastPage = totalChoices / TerminalEngine.PAGE_SIZE
+            repeat(pressesToLastPage) { pressKey(engine, "PageDown") }
+
+            val lastPage = engine.liveLine.value
+            assertTrue(lastPage.endsWith("Zorilla\n[$totalChoices total choices : PGUP/PGDN to navigate]> "))
+
+            pressKey(engine, "PageDown")
+            assertEquals(lastPage, engine.liveLine.value)
+        }
+
     @Test
     fun `PageUp does nothing on the first page of question 21`() =
         runTest {
