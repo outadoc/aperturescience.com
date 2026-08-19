@@ -6,6 +6,12 @@ package com.aperturescience.terminal
  */
 val EngineState.displayText: String
     get() {
-        val echoed = if (mode is Mode.Login.Password) "*".repeat(input.length) else input
+        val echoed =
+            if (mode is Mode.Login.Password) {
+                "*".repeat(input.length)
+            } else {
+                input
+            }
+
         return pageContent + echoed
     }

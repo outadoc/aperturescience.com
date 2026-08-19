@@ -38,11 +38,14 @@ class TerminalEngine(
             when (effect) {
                 is Effect.RevealCharacters -> {
                     for (char in effect.chars) {
-                        if (effect.delayMs > 0) maybeDelay(effect.delayMs.toLong())
+                        if (effect.delayMs > 0) {
+                            maybeDelay(effect.delayMs.toLong())
+                        }
                         dispatch(Intent.CharacterRevealed(char))
                     }
                     effect.thenDispatch?.let { dispatch(it) }
                 }
+
                 is Effect.Wait -> {
                     maybeDelay(effect.ms)
                     effect.thenDispatch?.let { dispatch(it) }
@@ -77,6 +80,8 @@ private fun synthesizeUid(): String {
     // 64 chars, matching the "64 digit UIN(+L)" prompt text and the original site.
     val chars = "0123456789abcdefghijklmnopqrstuvwxyz"
     return buildString {
-        repeat(64) { append(chars[Random.nextInt(chars.length)]) }
+        repeat(64) {
+            append(chars[Random.nextInt(chars.length)])
+        }
     }
 }
