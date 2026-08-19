@@ -121,10 +121,11 @@ class TerminalEngine(
 
     fun onKeyEvent(key: String): Boolean {
         if (state.isLocked) return true
+        val namedKey = NamedKey.from(key)
 
         // Cake/bosskey: any accepted key toggles between the two screens, no line input at all.
         if (state.mode == Mode.Cake || state.mode == Mode.BossKey) {
-            if (isAcceptedRawKey(key)) {
+            if (isAcceptedRawKey(namedKey, key)) {
                 scope.launch { toggleCakeBosskey() }
             }
             return true
@@ -132,23 +133,23 @@ class TerminalEngine(
 
         // NOTES.EXE forces every keystroke to behave like Enter.
         if (state.mode is Mode.Notes) {
-            if (isAcceptedRawKey(key)) {
+            if (isAcceptedRawKey(namedKey, key)) {
                 scope.launch { handleEnter() }
             }
             return true
         }
 
         when {
-            key == "Enter" -> scope.launch { handleEnter() }
-            key == "Backspace" -> {
+            namedKey == NamedKey.ENTER -> scope.launch { handleEnter() }
+            namedKey == NamedKey.BACKSPACE -> {
                 if (state.input.isNotEmpty()) {
                     state = state.copy(input = state.input.dropLast(1))
                     updateLiveLine()
                 }
             }
 
-            key == "PageUp" && state.mode is Mode.Application -> handlePaging(-PAGE_SIZE)
-            key == "PageDown" && state.mode is Mode.Application -> handlePaging(PAGE_SIZE)
+            namedKey == NamedKey.PAGE_UP && state.mode is Mode.Application -> handlePaging(-PAGE_SIZE)
+            namedKey == NamedKey.PAGE_DOWN && state.mode is Mode.Application -> handlePaging(PAGE_SIZE)
             key.length == 1 -> {
                 val c = key[0]
                 if (isAcceptedChar(c) && state.input.length < MAX_INPUT_LENGTH) {
@@ -664,17 +665,34 @@ class TerminalEngine(
         private const val BLINK_START = '\u0002' // STX
         private const val BLINK_END = '\u0003' // ETX
 
+        /** Keys [onKeyEvent] treats specially, as opposed to a single printable character (see
+         * [isAcceptedChar]) - the one place mapping the raw platform key-name string (both
+         * `ui-terminal`'s Mosaic and `ui-web`'s DOM `KeyboardEvent.key` already agree on these
+         * names) to a definite set the engine understands, instead of scattering string literals. */
+        private enum class NamedKey(
+            val keyName: String,
+        ) {
+            ENTER("Enter"),
+            BACKSPACE("Backspace"),
+            PAGE_UP("PageUp"),
+            PAGE_DOWN("PageDown"),
+            ARROW_LEFT("ArrowLeft"),
+            ;
+
+            companion object {
+                private val byName = entries.associateBy { it.keyName }
+
+                fun from(key: String): NamedKey? = byName[key]
+            }
+        }
+
         private fun isAcceptedChar(c: Char): Boolean =
             c.isDigit() || c.uppercaseChar() in 'A'..'Z' || c == ' ' || c == '?'
 
-        private fun isAcceptedRawKey(key: String): Boolean =
-            key == "Enter" ||
-                key == "Backspace" ||
-                key == "PageUp" ||
-                key == "PageDown" ||
-                key == "ArrowLeft" ||
-                key == " " ||
-                (key.length == 1 && isAcceptedChar(key[0]))
+        private fun isAcceptedRawKey(
+            namedKey: NamedKey?,
+            key: String,
+        ): Boolean = namedKey != null || key == " " || (key.length == 1 && isAcceptedChar(key[0]))
 
         private fun synthesizeUid(): String {
             // 64 chars, matching the "64 digit UIN(+L)" prompt text and the original site.
