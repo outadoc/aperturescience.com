@@ -131,7 +131,10 @@ object TerminalReducer {
         state: EngineState,
         key: String,
     ): Reduction {
-        if (state.isLocked) return Reduction(state)
+        if (state.isLocked) {
+            return Reduction(state)
+        }
+
         val namedKey = NamedKey.from(key)
 
         // Cake/bosskey: any accepted key toggles between the two screens, no line input at all.
@@ -384,7 +387,10 @@ object TerminalReducer {
                     advance = true
                     next =
                         next.copy(
-                            mode = Mode.Application(questionNumber = 1),
+                            mode =
+                                Mode.Application(
+                                    questionNumber = 1,
+                                ),
                         )
                 }
                 if (text == Command.QUIT) {
@@ -428,7 +434,11 @@ object TerminalReducer {
         val text = rawText.trimStart()
         if (text.isEmpty()) {
             // Matches the original: returns immediately without even clearing the field.
-            return Reduction(state.copy(isLocked = false))
+            return Reduction(
+                state.copy(
+                    isLocked = false,
+                ),
+            )
         }
 
         val args: List<String> = text.split(" ")
@@ -436,7 +446,10 @@ object TerminalReducer {
         var next = state
         when (args[0]) {
             Command.THECAKEISALIE -> {
-                next = state.copy(mode = Mode.Cake)
+                next =
+                    state.copy(
+                        mode = Mode.Cake,
+                    )
             }
 
             Command.DIR,
@@ -609,7 +622,10 @@ object TerminalReducer {
             Command.NOTES_EXE,
             -> {
                 if (state.isAdmin) {
-                    next = state.copy(mode = Mode.Notes(page = 1))
+                    next =
+                        state.copy(
+                            mode = Mode.Notes(page = 1),
+                        )
                 } else {
                     message =
                         buildString {
@@ -625,7 +641,10 @@ object TerminalReducer {
             Command.APPLY,
             Command.APPLY_EXE,
             -> {
-                next = state.copy(mode = Mode.Login.ApplicationIntro)
+                next =
+                    state.copy(
+                        mode = Mode.Login.ApplicationIntro,
+                    )
             }
 
             else -> {
@@ -741,14 +760,26 @@ object TerminalReducer {
         state: EngineState,
         errorMessage: String,
     ): Reduction {
-        val cleared = state.copy(pageContent = "", annotations = emptyList())
+        val cleared =
+            state.copy(
+                pageContent = "",
+                annotations = emptyList(),
+            )
+
         return Reduction(
             state = cleared,
             effects =
                 listOf(
                     revealEffect(
                         state = cleared,
-                        text = "\n[$errorMessage]\n",
+                        text =
+                            buildString {
+                                appendLine()
+                                append("[")
+                                append(errorMessage)
+                                append("]")
+                                appendLine()
+                            },
                         delayMs = GLADOS_SPEED,
                         unlock = true,
                     ),
@@ -783,7 +814,13 @@ object TerminalReducer {
      * runs, so there's no index math left to do here (mirrors switchPage()).
      */
     private fun showNextPage(state: EngineState): Reduction {
-        val cleared = state.copy(pageContent = "", annotations = emptyList(), input = "")
+        val cleared =
+            state.copy(
+                pageContent = "",
+                annotations = emptyList(),
+                input = "",
+            )
+
         val effects: List<Effect> =
             when (val current = cleared.mode) {
                 is Mode.Login -> {
@@ -858,7 +895,11 @@ object TerminalReducer {
                     )
                 }
             }
-        return Reduction(cleared, effects)
+
+        return Reduction(
+            state = cleared,
+            effects = effects,
+        )
     }
 
     private fun showQuestion(state: EngineState): Reduction {
@@ -932,7 +973,12 @@ object TerminalReducer {
         unlock: Boolean,
     ): Effect.RevealCharacters =
         Effect.RevealCharacters(
-            chars = buildRevealChars(text, state.uid, state.wrapWidth),
+            chars =
+                buildRevealChars(
+                    text = text,
+                    uid = state.uid,
+                    wrapWidth = state.wrapWidth,
+                ),
             delayMs = delayMs,
             thenDispatch =
                 if (unlock) {
