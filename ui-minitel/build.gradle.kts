@@ -20,6 +20,7 @@ dependencies {
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
     implementation(libs.kotlinx.serialization.json)
+    runtimeOnly(libs.logback.classic)
     testImplementation(libs.kotlin.test)
 }
 

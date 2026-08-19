@@ -12,6 +12,7 @@ kotlinx-serialization = "1.11.0"
 # outadoc/minipavi-kotlin, published via JitPack (no Maven Central releases) - see
 # https://github.com/outadoc/minipavi-kotlin/releases for newer tags.
 minipavi = "0.0.9"
+logback = "1.5.16"
 
 [libraries]
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
@@ -24,6 +25,7 @@ ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor"
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 minipavi-core = { module = "com.github.outadoc.minipavi-kotlin:core", version.ref = "minipavi" }
 minipavi-videotex = { module = "com.github.outadoc.minipavi-kotlin:videotex", version.ref = "minipavi" }
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 [plugins]
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
