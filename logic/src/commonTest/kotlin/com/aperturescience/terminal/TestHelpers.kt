@@ -3,11 +3,12 @@ package com.aperturescience.terminal
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 
-// Test-only driver helpers for TerminalEngine - each advances virtual time so callers never
-// need real-time waits for the typewriter animation.
+//region Test-only TerminalEngine driver helpers
 
 /**
- * Sends a single raw key (as [TerminalEngine.onKeyEvent] expects it) and settles.
+ * Sends a single raw key (as [TerminalEngine.onKeyEvent] expects it) and settles - each helper in
+ * this file advances virtual time so callers never need real-time waits for the typewriter
+ * animation.
  */
 fun TestScope.pressKey(
     engine: TerminalEngine,
@@ -66,3 +67,4 @@ fun TestScope.loginAsAdmin(engine: TerminalEngine = TerminalEngine()): TerminalE
     submit(engine, "TIER3")
     return engine
 }
+//endregion

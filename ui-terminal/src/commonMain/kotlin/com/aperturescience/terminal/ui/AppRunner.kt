@@ -6,8 +6,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
-// Mosaic has no built-in alt-screen support - this makes the program take over the whole
-// terminal like vim/htop, restoring whatever was on screen before launch on exit.
+/**
+ * Mosaic has no built-in alt-screen support - this pair, with [LEAVE_ALT_SCREEN], makes the
+ * program take over the whole terminal like vim/htop, restoring whatever was on screen
+ * before launch on exit.
+ */
 private const val ENTER_ALT_SCREEN = "[?1049h[H"
 private const val LEAVE_ALT_SCREEN = "[?1049l"
 

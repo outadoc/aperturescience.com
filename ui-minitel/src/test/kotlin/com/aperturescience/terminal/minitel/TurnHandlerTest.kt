@@ -12,8 +12,10 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class TurnHandlerTest {
-    // logged into the admin shell, with no open input zone shown yet - equivalent to what a real
-    // session would look like right before typing "NOTES".
+    /**
+     * Logged into the admin shell, with no open input zone shown yet - equivalent to what a
+     * real session would look like right before typing "NOTES".
+     */
     private val adminShellState =
         MinitelSessionState(
             mode = MinitelMode.Shell(),

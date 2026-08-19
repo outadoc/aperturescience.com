@@ -78,10 +78,14 @@ private fun renderScreen(
 
 private const val TERMINAL_ELEMENT_ID = "terminal"
 
-// Larger than any real line - just enough to keep TerminalEngine.wordWrap from ever triggering.
+/**
+ * Larger than any real line - just enough to keep `TerminalEngine.wordWrap` from ever triggering.
+ */
 private const val UNWRAPPED_WIDTH = Int.MAX_VALUE
 
-// Shares TerminalEngine's own list instead of a separately-maintained copy, so this can't drift.
+/**
+ * Shares [TerminalEngine]'s own list instead of a separately-maintained copy, so this can't drift.
+ */
 private val NAMED_KEYS = TerminalEngine.NAMED_KEYS
 
 /**

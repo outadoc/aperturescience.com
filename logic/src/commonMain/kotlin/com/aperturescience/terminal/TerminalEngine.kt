@@ -58,7 +58,10 @@ class TerminalEngine(
             isLocked = true,
         )
 
-    // Derived from isAdmin, not stored - a regular login never reassigns these.
+    /**
+     * Derived from [EngineState.isAdmin], not stored - a regular login never reassigns this
+     * or [gladosPrompt].
+     */
     private val gladosHeader: String
         get() =
             if (state.isAdmin) {
@@ -102,11 +105,12 @@ class TerminalEngine(
         reveal(TerminalData.loginFlowScreens[0], TerminalData.loginFlowScreenDelays[0])
     }
 
-    // Synchronous "batch" API for stateless hosts (e.g. a request/response Minitel service):
-    // runs a whole turn to completion via instantReveal, never touching `scope`.
+    //region Synchronous batch API for stateless hosts
 
     /**
-     * [boot]'s synchronous equivalent - only meaningful on a freshly-constructed engine.
+     * [boot]'s synchronous equivalent - only meaningful on a freshly-constructed engine. Like
+     * every function in this region, runs a whole turn to completion via [instantReveal] (e.g.
+     * for a request/response Minitel service), never touching [scope].
      */
     suspend fun bootTurn(): String {
         bootBody()
@@ -141,6 +145,7 @@ class TerminalEngine(
         handlePagingBody(delta)
         return liveLine.value
     }
+    //endregion
 
     fun onKeyEvent(key: String): Boolean {
         if (state.isLocked) return true
@@ -245,7 +250,9 @@ class TerminalEngine(
         }
     }
 
-    // Mode.Login — login / job-application flow (processInput0 + switchPage case 0)
+    /**
+     * [Mode.Login] - login / job-application flow (processInput0 + switchPage case 0).
+     */
     private suspend fun dispatchLogin(
         current: Mode.Login,
         text: String,
@@ -329,7 +336,9 @@ class TerminalEngine(
         finishTurn(advance)
     }
 
-    // Mode.Shell — GLaDOS shell (processInput1)
+    /**
+     * [Mode.Shell] - GLaDOS shell (processInput1).
+     */
     private suspend fun dispatchShell(rawText: String) {
         val text = rawText.trimStart()
         if (text.isEmpty()) {
@@ -452,7 +461,9 @@ class TerminalEngine(
         showNextPage()
     }
 
-    // Mode.Application — job application questionnaire (processInput2)
+    /**
+     * [Mode.Application] - job application questionnaire (processInput2).
+     */
     private suspend fun dispatchApplication(
         current: Mode.Application,
         text: String,
@@ -491,14 +502,16 @@ class TerminalEngine(
         finishTurn(advance)
     }
 
-    // Mode.Notes — NOTES.EXE reader (processInput5)
+    /**
+     * [Mode.Notes] - NOTES.EXE reader (processInput5).
+     */
     private suspend fun dispatchNotes(current: Mode.Notes) {
         val nextPage = current.page + 1
         state = state.copy(mode = if (nextPage > MAX_NOTES_PAGE) Mode.Shell() else Mode.Notes(page = nextPage))
         showNextPage()
     }
 
-    // shared helpers
+    //region Shared helpers
 
     /**
      * Accept/reject branch at the bottom of processInput0/processInput2.
@@ -732,6 +745,7 @@ class TerminalEngine(
                 Mode.Login.UinEntry -> 9
                 Mode.Login.Terminal -> 10
             }
+    //endregion
 
     companion object {
         private const val GLADOS_SPEED = 7
@@ -850,8 +864,10 @@ class TerminalEngine(
             }
         }
 
-        // Reconstructed as real sentences/paragraphs, not the original's per-line array split
-        // (an artifact of the Flash canvas' narrower width, not separate thoughts).
+        /**
+         * Reconstructed as real sentences/paragraphs, not the original's per-line array split
+         * (an artifact of the Flash canvas' narrower width, not separate thoughts).
+         */
         private val CAKE_MONOLOGUE_1 =
             listOf(
                 ">",

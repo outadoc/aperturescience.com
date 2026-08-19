@@ -1,5 +1,3 @@
-// Screen text, question list, and timing data ported verbatim from the decompiled ActionScript
-// (DoAction.as) of ApertureScience17 (2007-10-17).swf - see reference/decompiled/.
 package com.aperturescience.terminal.data
 
 enum class QuestionType { TEXT, CHECKBOX, RADIO }
@@ -11,6 +9,10 @@ data class Question(
     val choices: List<String>,
 )
 
+/**
+ * Screen text, question list, and timing data ported verbatim from the decompiled ActionScript
+ * (DoAction.as) of ApertureScience17 (2007-10-17).swf - see reference/decompiled/.
+ */
 object TerminalData {
     /**
      * Login/application-flow screen text - indexed by `TerminalEngine`'s per-`Mode.Login`

@@ -9,11 +9,15 @@ import platform.posix.exit
 import platform.posix.fflush
 import platform.posix.signal
 
-// staticCFunction bodies can't capture local state, so the action is stashed here instead.
+/**
+ * `staticCFunction` bodies can't capture local state, so the action is stashed here instead.
+ */
 private var terminationAction: (() -> Unit)? = null
 
-// atexit alone covers a normal return from main(), not external SIGTERM/SIGHUP - those need their
-// own signal() handler to call exit() (which then runs the atexit handlers).
+/**
+ * `atexit` alone covers a normal return from `main()`, not external SIGTERM/SIGHUP - those need
+ * their own `signal()` handler to call `exit()` (which then runs the atexit handlers).
+ */
 @OptIn(ExperimentalForeignApi::class)
 actual fun installTerminationHandler(action: () -> Unit) {
     terminationAction = action
