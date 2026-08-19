@@ -1,0 +1,3 @@
+- [ ] When not in development mode, first prompt (`> `) is never displayed
+- [ ] When not in development mode, UIL(+L) is not displayed, just blinking brackets
+- [x] Minitel paging conflicts with the paging of the questions section

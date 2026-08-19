@@ -3,9 +3,7 @@ package com.aperturescience.terminal.minitel
 import com.aperturescience.terminal.BLINK_TAG
 import com.aperturescience.terminal.Intent
 import com.aperturescience.terminal.Mode
-import com.aperturescience.terminal.PAGE_SIZE
 import com.aperturescience.terminal.TerminalEngine
-import com.aperturescience.terminal.data.TerminalData
 import com.aperturescience.terminal.displayText
 import fr.outadoc.minipavi.core.model.FunctionKey
 import fr.outadoc.minipavi.core.model.GatewayRequest
@@ -45,7 +43,6 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
     val functionKey = (request.event as? GatewayRequest.Event.KeyboardInput)?.key
 
     val mode = state.mode.toDomain()
-    val q21PaginationActive = isQ21PaginationActive(mode)
 
     var chunkIndex = state.chunkIndex
     when {
@@ -54,9 +51,11 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
         chunkIndex < lastChunkIndex && functionKey == FunctionKey.Suite -> {
             chunkIndex += 1
         }
+
         chunkIndex > 0 && functionKey == FunctionKey.Retour -> {
             chunkIndex -= 1
         }
+
         // Correction/Annulation/Repetition/Guide/Sommaire: no TerminalEngine equivalent, just redisplay.
         functionKey == FunctionKey.Repetition ||
             functionKey == FunctionKey.Guide ||
@@ -65,22 +64,17 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
             functionKey == FunctionKey.Correction -> {
             // no-op
         }
+
         chunkIndex == lastChunkIndex && hasOpenInputZone(mode) && functionKey == FunctionKey.Envoi -> {
             engine.dispatch(Intent.LineSubmitted(request.userInput.firstOrNull().orEmpty()))
             chunkIndex = 0
         }
+
         chunkIndex == lastChunkIndex && isAnyKeyMode(mode) && functionKey != null -> {
             engine.dispatch(Intent.Advanced)
             chunkIndex = 0
         }
-        chunkIndex == lastChunkIndex && q21PaginationActive && functionKey == FunctionKey.Suite -> {
-            engine.dispatch(Intent.Paged(PAGE_SIZE))
-            chunkIndex = 0
-        }
-        chunkIndex == lastChunkIndex && q21PaginationActive && functionKey == FunctionKey.Retour -> {
-            engine.dispatch(Intent.Paged(-PAGE_SIZE))
-            chunkIndex = 0
-        }
+
         else -> {
             // No recognized action on the current page - redisplay unchanged.
         }
@@ -97,12 +91,6 @@ suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceRes
 private fun hasOpenInputZone(mode: Mode): Boolean = mode is Mode.Login || mode is Mode.Shell || mode is Mode.Application
 
 private fun isAnyKeyMode(mode: Mode): Boolean = mode is Mode.Notes || mode is Mode.Cake || mode is Mode.BossKey
-
-private fun isQ21PaginationActive(mode: Mode): Boolean {
-    if (mode !is Mode.Application) return false
-    val question = TerminalData.questions.getOrNull(mode.questionNumber - 1) ?: return false
-    return question.choices.size > PAGE_SIZE
-}
 
 private fun isPasswordPrompt(mode: Mode): Boolean = mode is Mode.Login.Password
 

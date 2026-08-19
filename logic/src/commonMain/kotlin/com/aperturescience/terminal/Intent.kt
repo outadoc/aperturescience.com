@@ -32,13 +32,6 @@ sealed interface Intent {
     data object Advanced : Intent
 
     /**
-     * Batch equivalent of PageUp ([delta] negative)/PageDown ([delta] positive) on Q21.
-     */
-    data class Paged(
-        val delta: Int,
-    ) : Intent
-
-    /**
      * Reported viewport width, in columns, that future reveals should wrap to.
      */
     data class ViewportResized(

@@ -86,7 +86,7 @@ fun Mode.toData(): MinitelMode =
         Mode.Login.UinEntry -> MinitelMode.Login.UinEntry
         Mode.Login.Terminal -> MinitelMode.Login.Terminal
         is Mode.Shell -> MinitelMode.Shell(message = message)
-        is Mode.Application -> MinitelMode.Application(questionNumber = questionNumber, pageOffset = pageOffset)
+        is Mode.Application -> MinitelMode.Application(questionNumber = questionNumber)
         is Mode.Notes -> MinitelMode.Notes(page = page)
         Mode.Cake -> MinitelMode.Cake
         Mode.BossKey -> MinitelMode.BossKey
@@ -103,7 +103,7 @@ fun MinitelMode.toDomain(): Mode =
         MinitelMode.Login.UinEntry -> Mode.Login.UinEntry
         MinitelMode.Login.Terminal -> Mode.Login.Terminal
         is MinitelMode.Shell -> Mode.Shell(message = message)
-        is MinitelMode.Application -> Mode.Application(questionNumber = questionNumber, pageOffset = pageOffset)
+        is MinitelMode.Application -> Mode.Application(questionNumber = questionNumber)
         is MinitelMode.Notes -> Mode.Notes(page = page)
         MinitelMode.Cake -> Mode.Cake
         MinitelMode.BossKey -> Mode.BossKey

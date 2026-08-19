@@ -68,12 +68,10 @@ sealed interface Mode {
     ) : Mode
 
     /**
-     * [questionNumber] is 1-indexed; [pageOffset] is Q21's own >104-choice pagination cursor,
-     * reset to 0 on a new question.
+     * [questionNumber] is 1-indexed
      */
     data class Application(
         val questionNumber: Int,
-        val pageOffset: Int = 0,
     ) : Mode
 
     /**

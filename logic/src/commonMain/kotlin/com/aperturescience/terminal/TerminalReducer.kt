@@ -1,5 +1,14 @@
 package com.aperturescience.terminal
 
+import com.aperturescience.terminal.TerminalReducer.Command.CATALOG
+import com.aperturescience.terminal.TerminalReducer.Command.DIR
+import com.aperturescience.terminal.TerminalReducer.Command.DIRECTORY
+import com.aperturescience.terminal.TerminalReducer.gladosPrompt
+import com.aperturescience.terminal.TerminalReducer.reduceApplication
+import com.aperturescience.terminal.TerminalReducer.reduceKeyPressed
+import com.aperturescience.terminal.TerminalReducer.reduceLogin
+import com.aperturescience.terminal.TerminalReducer.reduceShell
+import com.aperturescience.terminal.TerminalReducer.showNextPage
 import com.aperturescience.terminal.data.QuestionType
 import com.aperturescience.terminal.data.TerminalData
 
@@ -28,16 +37,37 @@ object TerminalReducer {
         intent: Intent,
     ): Reduction =
         when (intent) {
-            Intent.Boot -> showNextPage(state)
-            is Intent.KeyPressed -> reduceKeyPressed(state, intent.key)
-            is Intent.LineSubmitted -> reduceLineSubmitted(state, intent.line)
-            Intent.Advanced -> reduceAdvanced(state)
-            is Intent.Paged -> reducePaged(state, intent.delta)
-            is Intent.ViewportResized ->
+            Intent.Boot -> {
+                showNextPage(state)
+            }
+
+            is Intent.KeyPressed -> {
+                reduceKeyPressed(state, intent.key)
+            }
+
+            is Intent.LineSubmitted -> {
+                reduceLineSubmitted(state, intent.line)
+            }
+
+            Intent.Advanced -> {
+                reduceAdvanced(state)
+            }
+
+            is Intent.ViewportResized -> {
                 Reduction(if (intent.columns > 0) state.copy(wrapWidth = intent.columns) else state)
-            is Intent.CharacterRevealed -> reduceCharacterRevealed(state, intent.char)
-            Intent.Unlocked -> Reduction(state.copy(isLocked = false))
-            Intent.ExitRequested -> Reduction(state.copy(exitRequested = true))
+            }
+
+            is Intent.CharacterRevealed -> {
+                reduceCharacterRevealed(state, intent.char)
+            }
+
+            Intent.Unlocked -> {
+                Reduction(state.copy(isLocked = false))
+            }
+
+            Intent.ExitRequested -> {
+                Reduction(state.copy(exitRequested = true))
+            }
         }
 
     private fun reduceCharacterRevealed(
@@ -45,7 +75,10 @@ object TerminalReducer {
         char: Char,
     ): Reduction =
         when (char) {
-            BLINK_START -> Reduction(state.copy(pendingAnnotationStart = state.pageContent.length))
+            BLINK_START -> {
+                Reduction(state.copy(pendingAnnotationStart = state.pageContent.length))
+            }
+
             BLINK_END -> {
                 val start = state.pendingAnnotationStart
                 Reduction(
@@ -60,7 +93,10 @@ object TerminalReducer {
                     },
                 )
             }
-            else -> Reduction(state.copy(pageContent = state.pageContent + char))
+
+            else -> {
+                Reduction(state.copy(pageContent = state.pageContent + char))
+            }
         }
 
     private fun reduceKeyPressed(
@@ -81,15 +117,18 @@ object TerminalReducer {
         }
 
         return when {
-            namedKey == NamedKey.ENTER -> commitEnter(state)
-            namedKey == NamedKey.BACKSPACE ->
+            namedKey == NamedKey.ENTER -> {
+                commitEnter(state)
+            }
+
+            namedKey == NamedKey.BACKSPACE -> {
                 if (state.input.isNotEmpty()) {
                     Reduction(state.copy(input = state.input.dropLast(1)))
                 } else {
                     Reduction(state)
                 }
-            namedKey == NamedKey.PAGE_UP && state.mode is Mode.Application -> reducePaged(state, -PAGE_SIZE)
-            namedKey == NamedKey.PAGE_DOWN && state.mode is Mode.Application -> reducePaged(state, PAGE_SIZE)
+            }
+
             key.length == 1 -> {
                 val c = key[0]
                 if (isAcceptedChar(c) && state.input.length < MAX_INPUT_LENGTH) {
@@ -98,7 +137,10 @@ object TerminalReducer {
                     Reduction(state)
                 }
             }
-            else -> Reduction(state)
+
+            else -> {
+                Reduction(state)
+            }
         }
     }
 
@@ -134,9 +176,13 @@ object TerminalReducer {
         val submitted = locked.input
         return when (val current = locked.mode) {
             is Mode.Login -> reduceLogin(locked, current, submitted)
+
             is Mode.Shell -> reduceShell(locked, submitted)
+
             is Mode.Application -> reduceApplication(locked, current, submitted)
+
             is Mode.Notes -> reduceNotes(locked, current)
+
             // Cake/bosskey's any-key handling goes through reduceAdvanced/toggleCakeBosskey, not here.
             Mode.Cake, Mode.BossKey -> Reduction(locked)
         }
@@ -161,6 +207,7 @@ object TerminalReducer {
                     next = next.copy(mode = Mode.Login.Help)
                 }
             }
+
             // Reading help then typing anything follows the same rules as the initial prompt.
             Mode.Login.Help -> {
                 advance = text == Command.LOGON || text == Command.LOGIN || text == Command.USER
@@ -223,8 +270,11 @@ object TerminalReducer {
                 next = next.copy(mode = if (text == Command.THECAKEISALIE) Mode.Cake else Mode.Login.Terminal)
                 advance = true
             }
+
             // Dead end - there is no way back from here.
-            Mode.Login.Terminal -> advance = false
+            Mode.Login.Terminal -> {
+                advance = false
+            }
         }
 
         return finishTurn(next, advance)
@@ -307,7 +357,10 @@ object TerminalReducer {
 
             Command.PLAY -> {
                 when {
-                    args.size == 1 -> message = "\n\nERROR 03 [What would you like to play?]"
+                    args.size == 1 -> {
+                        message = "\n\nERROR 03 [What would you like to play?]"
+                    }
+
                     args.getOrNull(1) == Command.PORTAL -> {
                         return farewell(state, "ERROR: TRAILER NOT FOUND")
                     }
@@ -384,7 +437,9 @@ object TerminalReducer {
                 advance = true
                 Mode.Shell()
             } else if (advance) {
-                current.copy(questionNumber = current.questionNumber + 1, pageOffset = 0)
+                current.copy(
+                    questionNumber = current.questionNumber + 1,
+                )
             } else {
                 current
             }
@@ -404,33 +459,6 @@ object TerminalReducer {
         return showNextPage(next)
     }
 
-    /**
-     * Q21's own >[PAGE_SIZE]-choice pagination.
-     */
-    private fun reducePaged(
-        state: EngineState,
-        delta: Int,
-    ): Reduction {
-        val current = state.mode as? Mode.Application ?: return Reduction(state)
-        val choices = TerminalData.questions[current.questionNumber - 1].choices
-        if (choices.size <= PAGE_SIZE) return Reduction(state)
-        // Matches the original: overshooting past the end reverts to the untouched offset rather
-        // than clamping to the last index, so a PageDown past the final (already-complete) page
-        // is a no-op instead of landing on a spurious page showing only the last item alone.
-        var next = current.pageOffset + delta
-        if (next < 0) next = 0
-        if (next > choices.size) next = current.pageOffset
-        if (next == current.pageOffset) return Reduction(state)
-        val cleared =
-            state.copy(
-                mode = current.copy(pageOffset = next),
-                isLocked = true,
-                pageContent = "",
-                annotations = emptyList(),
-            )
-        return showQuestion(cleared)
-    }
-
     private fun toggleCakeBosskey(state: EngineState): Reduction {
         val next = state.copy(mode = if (state.mode == Mode.Cake) Mode.BossKey else Mode.Cake)
         return showNextPage(next)
@@ -448,7 +476,12 @@ object TerminalReducer {
         return Reduction(
             cleared,
             listOf(
-                revealEffect(cleared, "\n[$errorMessage]\n", GLADOS_SPEED, unlock = true),
+                revealEffect(
+                    state = cleared,
+                    text = "\n[$errorMessage]\n",
+                    delayMs = GLADOS_SPEED,
+                    unlock = true,
+                ),
                 Effect.Wait(400, thenDispatch = Intent.ExitRequested),
             ),
         )
@@ -464,7 +497,12 @@ object TerminalReducer {
         if (advance) {
             showNextPage(state)
         } else {
-            Reduction(state.copy(input = "", isLocked = false))
+            Reduction(
+                state.copy(
+                    input = "",
+                    isLocked = false,
+                ),
+            )
         }
 
     /**
@@ -475,34 +513,68 @@ object TerminalReducer {
         val cleared = state.copy(pageContent = "", annotations = emptyList(), input = "")
         val effects: List<Effect> =
             when (val current = cleared.mode) {
-                is Mode.Login ->
+                is Mode.Login -> {
                     listOf(
                         revealEffect(
-                            cleared,
-                            TerminalData.loginFlowScreens[current.loginFlowScreenIndex],
-                            TerminalData.loginFlowScreenDelays[current.loginFlowScreenIndex],
+                            state = cleared,
+                            text = TerminalData.loginFlowScreens[current.loginFlowScreenIndex],
+                            delayMs = TerminalData.loginFlowScreenDelays[current.loginFlowScreenIndex],
                             unlock = true,
                         ),
                     )
-                is Mode.Shell ->
+                }
+
+                is Mode.Shell -> {
                     listOf(
                         revealEffect(
-                            cleared,
-                            gladosHeader(cleared) + current.message + gladosPrompt(cleared),
-                            GLADOS_SPEED,
+                            state = cleared,
+                            text =
+                                buildString {
+                                    append(gladosHeader(cleared))
+                                    append(current.message)
+                                    append(gladosPrompt(cleared))
+                                },
+                            delayMs = GLADOS_SPEED,
                             unlock = true,
                         ),
                     )
-                is Mode.Application -> return showQuestion(cleared)
-                Mode.BossKey -> listOf(revealEffect(cleared, BOSSKEY_SPREADSHEET, 0, unlock = true))
-                Mode.Cake ->
+                }
+
+                is Mode.Application -> {
+                    return showQuestion(cleared)
+                }
+
+                Mode.BossKey -> {
                     listOf(
-                        revealEffect(cleared, CAKE_MONOLOGUE_1, 0, unlock = false),
+                        revealEffect(
+                            state = cleared,
+                            text = BOSSKEY_SPREADSHEET,
+                            delayMs = 0,
+                            unlock = true,
+                        ),
+                    )
+                }
+
+                Mode.Cake -> {
+                    listOf(
+                        revealEffect(
+                            state = cleared,
+                            text = CAKE_MONOLOGUE_1,
+                            delayMs = 0,
+                            unlock = false,
+                        ),
                         Effect.Wait(2000),
-                        revealEffect(cleared, CAKE_MONOLOGUE_2, 0, unlock = true),
+                        revealEffect(
+                            state = cleared,
+                            text = CAKE_MONOLOGUE_2,
+                            delayMs = 0,
+                            unlock = true,
+                        ),
                     )
+                }
+
                 // notesHistoryPages already ends in "[MORE]"/"[END]" - nothing appended here.
-                is Mode.Notes ->
+                is Mode.Notes -> {
                     listOf(
                         revealEffect(
                             cleared,
@@ -511,6 +583,7 @@ object TerminalReducer {
                             unlock = true,
                         ),
                     )
+                }
             }
         return Reduction(cleared, effects)
     }
@@ -518,34 +591,63 @@ object TerminalReducer {
     private fun showQuestion(state: EngineState): Reduction {
         val current = state.mode as Mode.Application
         val question = TerminalData.questions[current.questionNumber - 1]
-        val header = "Form FORMS-EN-2873-FORM - Page ${current.questionNumber}\n\n${question.text}\n\n"
+        val header =
+            buildString {
+                append("Form FORMS-EN-2873-FORM - Page ")
+                append(current.questionNumber)
+                appendLine()
+                appendLine()
+                append(question.text)
+                appendLine()
+                appendLine()
+            }
+
         if (question.type == QuestionType.TEXT) {
-            return Reduction(state, listOf(revealEffect(state, header + "> ", 25, unlock = true)))
+            return Reduction(
+                state,
+                listOf(
+                    revealEffect(
+                        state = state,
+                        text = "$header> ",
+                        delayMs = 25,
+                        unlock = true,
+                    ),
+                ),
+            )
         }
 
-        val total = question.choices.size
-        val padWidth = (total + 1).toString().length
-        val pageEnd = minOf(current.pageOffset + PAGE_SIZE, total)
+        val padWidth = (question.choices.size + 1).toString().length
         val body =
             buildString {
-                for (i in current.pageOffset until pageEnd) {
-                    append((i + 1).toString().padStart(padWidth, '0'))
+                question.choices.forEachIndexed { index, choice ->
+                    append(
+                        (index + 1)
+                            .toString()
+                            .padStart(padWidth, '0'),
+                    )
                     append("] ")
-                    append(question.choices[i])
-                    append('\n')
+                    append(choice)
+                    appendLine()
                 }
             }
-        val prompt =
-            if (total > PAGE_SIZE) {
-                "[$total total choices : PGUP/PGDN to navigate]> "
-            } else {
-                "> "
-            }
+
+        val prompt = "> "
+
         return Reduction(
             state,
             listOf(
-                revealEffect(state, header, if (current.pageOffset > 0) 1 else 15, unlock = false),
-                revealEffect(state, body + prompt, 0, unlock = true),
+                revealEffect(
+                    state = state,
+                    text = header,
+                    delayMs = 15,
+                    unlock = false,
+                ),
+                revealEffect(
+                    state = state,
+                    text = body + prompt,
+                    delayMs = 0,
+                    unlock = true,
+                ),
             ),
         )
     }
