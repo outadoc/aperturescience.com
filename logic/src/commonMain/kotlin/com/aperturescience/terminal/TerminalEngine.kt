@@ -320,12 +320,12 @@ class TerminalEngine(
             "DIR", "CATALOG", "DIRECTORY", "LIST", "LS", "CAT" -> {
                 message =
                     if (state.isAdmin) {
-                        "\nDISK VOLUME 255 [WORKSTATION CJOHNSON]\n\n" +
+                        "\n\nDISK VOLUME 255 [WORKSTATION CJOHNSON]\n\n" +
                             "     I  019  APPLY.EXE\n     I  004  NOTES.EXE\n\n" +
-                            "2 FILE(S) IN 23 BLOCKS\n"
+                            "2 FILE(S) IN 23 BLOCKS\n\n"
                     } else {
-                        "\nDISK VOLUME 255 [NEW EMPLOYEE WORKSTATION]\n\n" +
-                            "     I  019  APPLY.EXE\n\n1 FILE(S) IN 19 BLOCKS\n"
+                        "\n\nDISK VOLUME 255 [NEW EMPLOYEE WORKSTATION]\n\n" +
+                            "     I  019  APPLY.EXE\n\n1 FILE(S) IN 19 BLOCKS\n\n"
                     }
             }
 

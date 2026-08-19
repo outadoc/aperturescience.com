@@ -31,6 +31,18 @@ class ShellCommandsTest {
             assertTrue(output.contains("2 FILE(S) IN 23 BLOCKS"))
         }
 
+    /** Matches the original: a blank line pads both above "DISK VOLUME" and below the block
+     * count, same as every other shell error message (e.g. `ERROR 15 [Disk is write protected]`). */
+    @Test
+    fun `DIR pads the listing with a blank line above and below`() =
+        runTest {
+            val engine = loginToShell()
+            submit(engine, "DIR")
+            val output = engine.liveLine.value
+            assertTrue(output.contains("Inc.\n\nDISK VOLUME 255 [NEW EMPLOYEE WORKSTATION]"))
+            assertTrue(output.contains("1 FILE(S) IN 19 BLOCKS\n\n"))
+        }
+
     @Test
     fun `CATALOG DIRECTORY LIST LS and CAT are all aliases for DIR`() =
         runTest {
