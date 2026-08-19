@@ -179,4 +179,23 @@ class BatchApiTest {
             assertEquals(engine.liveLine.value, resumed.liveLine.value)
             assertEquals(snapshot, resumed.captureState())
         }
+
+    @Test
+    fun `a captured UID-screen snapshot round-trips its blink annotation through EngineState`() =
+        runTest {
+            val engine = TerminalEngine(instantReveal = true)
+            engine.bootTurn()
+            engine.submitLine("LOGON")
+            engine.submitLine("TESTER")
+            engine.submitLine("PORTAL")
+            engine.submitLine("APPLY")
+            engine.submitLine("CONTINUE") // -> UID display screen, the one blinking screen
+
+            val snapshot = engine.captureState()
+            assertTrue(snapshot.annotations.any { it.tag == BLINK_TAG })
+
+            val resumed = TerminalEngine(instantReveal = true, initialState = snapshot)
+            assertEquals(snapshot, resumed.captureState())
+            assertEquals(snapshot.annotations, resumed.annotations.value)
+        }
 }

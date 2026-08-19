@@ -10,4 +10,5 @@ data class EngineState(
     val input: String,
     val wrapWidth: Int,
     val isLocked: Boolean,
+    val annotations: List<TextAnnotation> = emptyList(),
 )

@@ -5,9 +5,11 @@ import fr.outadoc.minipavi.core.model.GatewayRequest
 import fr.outadoc.minipavi.core.model.GatewayRequest.Event
 import fr.outadoc.minipavi.core.model.ServiceResponse
 import kotlinx.coroutines.runBlocking
+import kotlinx.io.bytestring.indexOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertTrue
 
 class TurnHandlerTest {
     // logged into the admin shell, with no open input zone shown yet - equivalent to what a real
@@ -113,5 +115,43 @@ class TurnHandlerTest {
         check(command is ServiceResponse.Command.InputText)
         // Header wraps to 2 lines + a blank line + "ADMIN> " = row 4, where the input zone belongs.
         assertEquals(4, command.line)
+    }
+
+    /** The UID display screen's bracketed UID must blink - reached via a regular (non-admin)
+     * login, "APPLY", then "CONTINUE". */
+    @Test
+    fun `the UID display screen wraps the bracketed UID in VideotexBuilder's withBlink`() {
+        val connected =
+            runBlocking {
+                handleTurn(
+                    GatewayRequest(
+                        gatewayVersion = "1.0",
+                        minitelVersion = "???",
+                        userId = "test",
+                        remoteAddress = "127.0.0.1",
+                        socketType = GatewayRequest.SocketType.WebSocket,
+                        state = MinitelSessionState.initial(),
+                        event = Event.Connection,
+                        userInput = emptyList(),
+                    ),
+                )
+            }
+        val usernamePrompt = turn(connected.state, FunctionKey.Envoi, userInput = listOf("LOGON"))
+        val passwordPrompt = turn(usernamePrompt.state, FunctionKey.Envoi, userInput = listOf("TESTER"))
+        val shellPrompt = turn(passwordPrompt.state, FunctionKey.Envoi, userInput = listOf("PORTAL"))
+        // The intro paragraph spans more than one 40x24 Minitel screen - page through with Suite
+        // until the input zone opens, same as a real session would.
+        var introScreen = turn(shellPrompt.state, FunctionKey.Envoi, userInput = listOf("APPLY"))
+        while (introScreen.command !is ServiceResponse.Command.InputText) {
+            introScreen = turn(introScreen.state, FunctionKey.Suite)
+        }
+        val uidScreen = turn(introScreen.state, FunctionKey.Envoi, userInput = listOf("CONTINUE"))
+
+        // VDT_BLINK = ESC H (0x1B, 0x48), VDT_FIXED = ESC I (0x1B, 0x49) - see minipavi-kotlin's
+        // (internal) VdtConstants.
+        val blinkStart = uidScreen.content.indexOf(byteArrayOf(0x1B, 0x48))
+        val blinkEnd = uidScreen.content.indexOf(byteArrayOf(0x1B, 0x49))
+        assertTrue(blinkStart >= 0, "expected a VDT_BLINK sequence in the UID display screen")
+        assertTrue(blinkEnd > blinkStart, "expected VDT_FIXED to follow VDT_BLINK")
     }
 }

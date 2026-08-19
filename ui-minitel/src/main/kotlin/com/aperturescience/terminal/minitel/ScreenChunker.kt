@@ -24,4 +24,21 @@ object ScreenChunker {
         val chunks = lines.chunked(rowsPerScreen)
         return chunks.ifEmpty { listOf(emptyList()) }
     }
+
+    /** Absolute start offset (in [fullText]) of each line [chunk] returns, chunked identically -
+     * `chunkStartOffsets(t, n)[c][i]` is exactly where `chunk(t, n)[c][i]` starts in [fullText].
+     * Lets a caller intersect a whole-text offset range against one rendered chunk's lines. */
+    fun chunkStartOffsets(
+        fullText: String,
+        rowsPerScreen: Int = ROWS_PER_SCREEN,
+    ): List<List<Int>> {
+        val offsets = mutableListOf<Int>()
+        var pos = 0
+        for (line in fullText.split("\n")) {
+            offsets.add(pos)
+            pos += line.length + 1
+        }
+        val chunks = offsets.chunked(rowsPerScreen)
+        return chunks.ifEmpty { listOf(emptyList()) }
+    }
 }

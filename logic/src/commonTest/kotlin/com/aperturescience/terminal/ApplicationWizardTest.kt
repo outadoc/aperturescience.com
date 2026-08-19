@@ -69,6 +69,45 @@ class ApplicationWizardTest {
         }
 
     @Test
+    fun `CONTINUE at the intro screen sets a blink annotation covering exactly the bracketed UID`() =
+        runTest {
+            val engine = loginToShell()
+            submit(engine, "APPLY")
+            submit(engine, "CONTINUE")
+            val annotation = engine.annotations.value.singleOrNull { it.tag == BLINK_TAG }
+            assertTrue(annotation != null)
+            val range = annotation.range
+            assertEquals("[${engine.captureState().uid}]", engine.liveLine.value.substring(range.first, range.last + 1))
+        }
+
+    @Test
+    fun `annotations are empty on screens with no blinking content`() =
+        runTest {
+            val engine = loginToShell()
+            assertTrue(engine.annotations.value.isEmpty())
+            submit(engine, "APPLY")
+            assertTrue(engine.annotations.value.isEmpty())
+        }
+
+    @Test
+    fun `a narrow viewport wraps the UID across lines without losing or duplicating a character`() =
+        runTest {
+            val engine = loginToShell()
+            engine.setViewportWidth(20) // forces the 66-char bracketed UID to hard-wrap
+            submit(engine, "APPLY")
+            submit(engine, "CONTINUE")
+            val range =
+                engine.annotations.value
+                    .single { it.tag == BLINK_TAG }
+                    .range
+            val blinkingText =
+                engine.liveLine.value
+                    .substring(range.first, range.last + 1)
+                    .replace("\n", "")
+            assertEquals("[${engine.captureState().uid}]", blinkingText)
+        }
+
+    @Test
     fun `CONTINUE at the UID screen shows question 1`() =
         runTest {
             val engine = enterApplication()

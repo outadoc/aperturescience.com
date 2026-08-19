@@ -1,11 +1,13 @@
 package com.aperturescience.terminal.web
 
+import com.aperturescience.terminal.BLINK_TAG
 import com.aperturescience.terminal.TerminalEngine
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLPreElement
@@ -21,7 +23,10 @@ fun main() {
     val screen = document.getElementById(TERMINAL_ELEMENT_ID) as HTMLPreElement
 
     scope.launch {
-        engine.liveLine.collectLatest { screen.textContent = it }
+        combine(engine.liveLine, engine.annotations, ::Pair).collectLatest { (line, annotations) ->
+            val blinkRange = annotations.firstOrNull { it.tag == BLINK_TAG }?.range
+            renderScreen(screen, line, blinkRange)
+        }
     }
 
     // No process to exit here - just stop reacting to keystrokes once the session ends.
@@ -43,6 +48,28 @@ fun main() {
     window.addEventListener("keydown", onKeyDown)
 
     engine.boot(scope)
+}
+
+/** Plain [line] when there's nothing to blink; otherwise rebuilds [screen]'s children around a
+ * `<span class="blink-text">` wrapping [blinkRange]. Phase-locked to the cursor's own blink
+ * entirely via CSS (both read the same inherited `--blink-opacity`, see styles.css) - a span
+ * created mid-session is in sync from its very first frame, no JS timing math needed. */
+private fun renderScreen(
+    screen: HTMLPreElement,
+    line: String,
+    blinkRange: IntRange?,
+) {
+    if (blinkRange == null || blinkRange.last >= line.length) {
+        screen.textContent = line
+        return
+    }
+    while (screen.firstChild != null) screen.removeChild(screen.firstChild!!)
+    screen.appendChild(document.createTextNode(line.substring(0, blinkRange.first)))
+    val span = document.createElement("span")
+    span.className = "blink-text"
+    span.textContent = line.substring(blinkRange.first, blinkRange.last + 1)
+    screen.appendChild(span)
+    screen.appendChild(document.createTextNode(line.substring(blinkRange.last + 1)))
 }
 
 private const val TERMINAL_ELEMENT_ID = "terminal"

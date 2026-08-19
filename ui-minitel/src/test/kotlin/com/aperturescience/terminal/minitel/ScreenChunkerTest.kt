@@ -57,4 +57,22 @@ class ScreenChunkerTest {
         val text = (1..25).joinToString("\n") { "x" }
         assertEquals(ScreenChunker.chunk(text), ScreenChunker.chunk(text, rowsPerScreen = 24))
     }
+
+    @Test
+    fun `chunkStartOffsets lines up 1-to-1 with chunk's own lines`() {
+        val text = (1..30).joinToString("\n") { "line $it" }
+        val chunks = ScreenChunker.chunk(text, rowsPerScreen = 24)
+        val offsets = ScreenChunker.chunkStartOffsets(text, rowsPerScreen = 24)
+        assertEquals(chunks.map { it.size }, offsets.map { it.size })
+        for ((c, offsetsInChunk) in offsets.withIndex()) {
+            for ((i, offset) in offsetsInChunk.withIndex()) {
+                assertEquals(chunks[c][i], text.substring(offset, offset + chunks[c][i].length))
+            }
+        }
+    }
+
+    @Test
+    fun `empty text produces a single offset of zero`() {
+        assertEquals(listOf(listOf(0)), ScreenChunker.chunkStartOffsets(""))
+    }
 }

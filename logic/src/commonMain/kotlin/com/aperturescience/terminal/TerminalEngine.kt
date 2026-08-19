@@ -22,6 +22,12 @@ class TerminalEngine(
     private val _liveLine = MutableStateFlow("")
     val liveLine: StateFlow<String> = _liveLine.asStateFlow()
 
+    private val _annotations = MutableStateFlow<List<TextAnnotation>>(emptyList())
+
+    /** Tagged spans over [liveLine] (e.g. [BLINK_TAG]) - live counterpart to
+     * [EngineState.annotations], published as soon as a span finishes revealing. */
+    val annotations: StateFlow<List<TextAnnotation>> = _annotations.asStateFlow()
+
     private val _exitRequested = MutableStateFlow(false)
 
     /** True once the session should end (LOGOUT/PLAY PORTAL). */
@@ -53,8 +59,12 @@ class TerminalEngine(
         get() = if (state.isAdmin) "^^ADMIN> " else " ^^B:\\> "
 
     init {
-        // Seeds liveLine when resuming from a captured state, so it's not blank until next turn.
-        if (initialState != null) updateLiveLine()
+        // Seeds liveLine/annotations when resuming from a captured state, so they're not blank
+        // until next turn.
+        if (initialState != null) {
+            updateLiveLine()
+            _annotations.value = state.annotations
+        }
     }
 
     /** Column width future [reveal]-wrapped lines are hard-wrapped to - not a cap; callers who
@@ -156,8 +166,9 @@ class TerminalEngine(
     }
 
     private fun clearScreen() {
-        state = state.copy(pageContent = "")
+        state = state.copy(pageContent = "", annotations = emptyList())
         _liveLine.value = ""
+        _annotations.value = emptyList()
     }
 
     private suspend fun handlePagingBody(delta: Int) {
@@ -505,28 +516,35 @@ class TerminalEngine(
     }
 
     /** Types [text] out one character at a time onto [EngineState.pageContent]. `^` becomes a
-     * newline, `@` the uid, word-wrapped to [EngineState.wrapWidth]. delayMs <= 0 reveals instantly. */
+     * newline, `@` the uid (wrapped in [BLINK_START]/[BLINK_END], see [markAnnotationEnd]),
+     * word-wrapped to [EngineState.wrapWidth]. delayMs <= 0 reveals instantly. */
     private suspend fun reveal(
         text: String,
         delayMs: Int,
         unlockAfter: Boolean = true,
     ) {
-        val logicalLines = text.replace("@", "[${state.uid}]").replace("^", "\n").split("\n")
+        val uidToken = "$BLINK_START[${state.uid}]$BLINK_END"
+        val logicalLines = text.replace("@", uidToken).replace("^", "\n").split("\n")
         val lines = logicalLines.flatMap { wordWrap(it, state.wrapWidth) }
+        var blinkStart: Int? = null
         for ((index, line) in lines.withIndex()) {
             val base = state.pageContent
-            if (delayMs > 0) {
-                val sb = StringBuilder()
-                for (ch in line) {
-                    sb.append(ch)
-                    _liveLine.value = base + sb
-                    maybeDelay(delayMs.toLong())
+            val sb = StringBuilder()
+            for (ch in line) {
+                when (ch) {
+                    BLINK_START -> blinkStart = base.length + sb.length
+                    BLINK_END -> blinkStart?.let { markAnnotationEnd(BLINK_TAG, it, base.length + sb.length) }
+                    else -> {
+                        sb.append(ch)
+                        if (delayMs > 0) {
+                            _liveLine.value = base + sb
+                            maybeDelay(delayMs.toLong())
+                        }
+                    }
                 }
-                state = state.copy(pageContent = base + sb)
-            } else {
-                state = state.copy(pageContent = base + line)
-                _liveLine.value = state.pageContent
             }
+            state = state.copy(pageContent = base + sb)
+            _liveLine.value = state.pageContent
             if (index != lines.lastIndex) {
                 state = state.copy(pageContent = state.pageContent + "\n")
             }
@@ -537,6 +555,18 @@ class TerminalEngine(
         }
     }
 
+    /** Publishes a [TextAnnotation] the instant a marked span finishes revealing - not deferred
+     * to the end of the whole [reveal] call, so a still-typing trailing paragraph doesn't delay
+     * e.g. blink onset. */
+    private fun markAnnotationEnd(
+        tag: String,
+        start: Int,
+        end: Int,
+    ) {
+        state = state.copy(annotations = state.annotations + TextAnnotation(tag, start until end))
+        _annotations.value = state.annotations
+    }
+
     /** Reveals every line instantly, appending onto [EngineState.pageContent] (see [reveal]). */
     private suspend fun revealInstant(text: String) = reveal(text, 0)
 
@@ -544,20 +574,21 @@ class TerminalEngine(
         line: String,
         width: Int,
     ): List<String> {
-        if (line.length <= width) return listOf(line)
+        if (visibleLength(line) <= width) return listOf(line)
         val result = mutableListOf<String>()
         val current = StringBuilder()
         for (word in line.split(" ")) {
             var w = word
-            while (w.length > width) {
+            while (visibleLength(w) > width) {
                 if (current.isNotEmpty()) {
                     result.add(current.toString())
                     current.clear()
                 }
-                result.add(w.substring(0, width))
-                w = w.substring(width)
+                val (head, tail) = splitAtVisibleWidth(w, width)
+                result.add(head)
+                w = tail
             }
-            val candidateLen = current.length + (if (current.isEmpty()) 0 else 1) + w.length
+            val candidateLen = visibleLength(current) + (if (current.isEmpty()) 0 else 1) + visibleLength(w)
             if (candidateLen > width && current.isNotEmpty()) {
                 result.add(current.toString())
                 current.clear()
@@ -567,6 +598,32 @@ class TerminalEngine(
         }
         if (current.isNotEmpty() || result.isEmpty()) result.add(current.toString())
         return result
+    }
+
+    /** [BLINK_START]/[BLINK_END] carry no visible width - wrap decisions go by what actually
+     * occupies a column, not raw [CharSequence.length]. */
+    private fun visibleLength(s: CharSequence): Int {
+        var count = 0
+        for (c in s) if (c != BLINK_START && c != BLINK_END) count++
+        return count
+    }
+
+    /** [wordWrap]'s hard-cut path, marker-aware: splits [s] at exactly [width] visible
+     * characters, keeping any [BLINK_START]/[BLINK_END] interleaved within the head intact and in
+     * order. A marker landing right at the cut boundary stays attached to the head, so it can
+     * never end up alone as an all-invisible trailing "line". */
+    private fun splitAtVisibleWidth(
+        s: String,
+        width: Int,
+    ): Pair<String, String> {
+        var visible = 0
+        var i = 0
+        while (i < s.length && visible < width) {
+            if (s[i] != BLINK_START && s[i] != BLINK_END) visible++
+            i++
+        }
+        while (i < s.length && (s[i] == BLINK_START || s[i] == BLINK_END)) i++
+        return s.substring(0, i) to s.substring(i)
     }
 
     /** Which qar/qdelay entry each [Mode.Login] state reveals - a rendering detail local to
@@ -596,6 +653,11 @@ class TerminalEngine(
         /** Default wrap width, matching the original's pixel-width auto-wrap threshold. */
         const val WRAP_WIDTH = 100
         private const val MAX_NOTES_PAGE = 4
+
+        /** Never appear in real content (control chars) - mark the start/end of a [reveal]d span
+         * that should carry a [TextAnnotation], stripped from [EngineState.pageContent] itself. */
+        private const val BLINK_START = '\u0002' // STX
+        private const val BLINK_END = '\u0003' // ETX
 
         private fun isAcceptedChar(c: Char): Boolean =
             c.isDigit() || c.uppercaseChar() in 'A'..'Z' || c == ' ' || c == '?'

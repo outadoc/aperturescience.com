@@ -1,9 +1,12 @@
 package com.aperturescience.terminal.minitel
 
+import com.aperturescience.terminal.BLINK_TAG
 import com.aperturescience.terminal.EngineState
 import com.aperturescience.terminal.Mode
+import com.aperturescience.terminal.TextAnnotation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class MinitelSessionStateTest {
     private val sampleEngineState =
@@ -43,5 +46,18 @@ class MinitelSessionStateTest {
         assertEquals(0, initial.chunkIndex)
         assertEquals(false, initial.pendingDisconnect)
         assertEquals(true, initial.isLocked)
+    }
+
+    @Test
+    fun `toEngineState round-trips a non-empty annotations list unchanged`() {
+        val withBlink = sampleEngineState.copy(annotations = listOf(TextAnnotation(BLINK_TAG, 5 until 12)))
+        val minitelState = MinitelSessionState.from(withBlink)
+        assertEquals(withBlink, minitelState.toEngineState())
+    }
+
+    @Test
+    fun `annotations defaults to empty when not specified`() {
+        val minitelState = MinitelSessionState.from(sampleEngineState)
+        assertTrue(minitelState.annotations.isEmpty())
     }
 }

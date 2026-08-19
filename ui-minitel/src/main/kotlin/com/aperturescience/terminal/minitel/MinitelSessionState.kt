@@ -14,6 +14,7 @@ data class MinitelSessionState(
     val input: String,
     val wrapWidth: Int,
     val isLocked: Boolean,
+    val annotations: List<MinitelTextAnnotation> = emptyList(),
     val chunkIndex: Int = 0,
     val pendingDisconnect: Boolean = false,
 ) {
@@ -26,6 +27,7 @@ data class MinitelSessionState(
             input = input,
             wrapWidth = wrapWidth,
             isLocked = isLocked,
+            annotations = annotations.map { it.toDomain() },
         )
 
     companion object {
@@ -43,6 +45,7 @@ data class MinitelSessionState(
                     input = input,
                     wrapWidth = wrapWidth,
                     isLocked = isLocked,
+                    annotations = annotations.map { it.toData() },
                     chunkIndex = chunkIndex,
                     pendingDisconnect = pendingDisconnect,
                 )

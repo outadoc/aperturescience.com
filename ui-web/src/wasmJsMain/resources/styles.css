@@ -38,6 +38,13 @@ body {
         0 0 6px rgba(51, 255, 102, 0.35);
 
     caret-color: transparent;
+
+    /* Single shared clock for every blink effect on the page (cursor, .blink-text spans) - they
+       don't run their own `animation`, they just read this inherited custom property. That's what
+       keeps them phase-locked to each other with no JS bookkeeping: a .blink-text span created
+       mid-session still reads the same live value the cursor (blinking since page load) does,
+       since there's only ever one animation instance driving it. */
+    animation: blink 1s step-start infinite;
 }
 
 /* A permanent blinking block cursor at the very end of the visible text - TerminalEngine has no
@@ -45,13 +52,19 @@ body {
    exactly here, matching the original's own typewriter model. */
 #terminal::after {
     content: "\2588";
-    animation: blink 1s step-start infinite;
+    opacity: var(--blink-opacity, 1);
 }
 
 @keyframes blink {
     50% {
-        opacity: 0;
+        --blink-opacity: 0;
     }
+}
+
+/* Spans marked by TerminalEngine as blinking (e.g. the UID display screen) - reads the same
+   inherited clock as the cursor above, see #terminal's `animation`. */
+.blink-text {
+    opacity: var(--blink-opacity, 1);
 }
 
 /* Subtle CRT scanline overlay for flavor - faint enough not to hurt legibility or fight the
