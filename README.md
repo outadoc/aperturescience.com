@@ -122,25 +122,25 @@ them. Error/rejection text is quoted verbatim.
 
 ```mermaid
 flowchart TD
-    Boot(["Boot"]) --> Prompt["&quot;&gt; &quot;<br/>(initial prompt)"]
+    Boot(["Boot"]) --> Prompt["#quot;#gt; #quot;<br/>(initial prompt)"]
     Prompt -- " HELP / ? " --> HelpJoke["'crisis response team'<br/>joke message"] --> Prompt
-    Prompt -- " LOGON / LOGIN / USER " --> Username["&quot;Username&gt; &quot;"]
+    Prompt -- " LOGON / LOGIN / USER " --> Username["#quot;Username#gt; #quot;"]
     Prompt -- " anything else " --> Prompt
     Username -- " text ≤ 2 chars: rejected " --> Username
-    Username -- " text &gt; 2 chars " --> Password["&quot;Password&gt; &quot;<br/>(echoed as ***)"]
-    Password -- " user = CJOHNSON<br/>pass = &quot;TIER3&quot; " --> ShellAdmin["SHELL (admin)<br/>GLaDOS v1.07a — &quot;ADMIN&gt;&quot;"]
-    Password -- " user = CJOHNSON<br/>pass ≠ &quot;TIER3&quot; " --> ErrPw1["ERROR 07<br/>Incorrect Password"] --> Password
-    Password -- " user ≠ CJOHNSON<br/>pass = &quot;PORTAL&quot; / &quot;PORTALS&quot; " --> ShellUser["SHELL (regular)<br/>GLaDOS v1.07 — &quot;B:\&gt;&quot;"]
-    Password -- " user ≠ CJOHNSON<br/>pass ≠ &quot;PORTAL&quot; / &quot;PORTALS&quot; " --> ErrPw2["ERROR 07<br/>Incorrect Password"] --> Password
+    Username -- " text #gt; 2 chars " --> Password["#quot;Password#gt; #quot;<br/>(echoed as ***)"]
+    Password -- " user = CJOHNSON<br/>pass = #quot;TIER3#quot; " --> ShellAdmin["SHELL (admin)<br/>GLaDOS v1.07a — #quot;ADMIN#gt;#quot;"]
+    Password -- " user = CJOHNSON<br/>pass ≠ #quot;TIER3#quot; " --> ErrPw1["ERROR 07<br/>Incorrect Password"] --> Password
+    Password -- " user ≠ CJOHNSON<br/>pass = #quot;PORTAL#quot; / #quot;PORTALS#quot; " --> ShellUser["SHELL (regular)<br/>GLaDOS v1.07 — #quot;B:\#gt;#quot;"]
+    Password -- " user ≠ CJOHNSON<br/>pass ≠ #quot;PORTAL#quot; / #quot;PORTALS#quot; " --> ErrPw2["ERROR 07<br/>Incorrect Password"] --> Password
     ShellAdmin --> Shell{{"SHELL"}}
     ShellUser --> Shell
     Shell -- " DIR / CATALOG / DIRECTORY / LIST / LS / CAT " --> Dir["directory listing:<br/>APPLY.EXE (+ NOTES.EXE if admin)"] --> Shell
-    Shell -- " IP " --> Ip["&quot;uid:&lt;session id&gt;&quot;"] --> Shell
+    Shell -- " IP " --> Ip["#quot;uid:#lt;session id#gt;#quot;"] --> Shell
     Shell -- " HELP / LIB / ? " --> HelpList["command list<br/>(+ NOTES if admin)"] --> Shell
     Shell -- " APPEND / ATTRIB / COPY / FORMAT / ERASE / RENAME " --> ErrWrite["ERROR 15<br/>Disk is write protected"] --> Shell
     Shell -- " PLAY (no argument) " --> ErrPlay["ERROR 03<br/>What would you like to play?"] --> Shell
     Shell -- " PLAY PORTAL " --> ExitPlay(["prints message,<br/>exits program"])
-    Shell -- " PLAY &lt;anything else&gt; " --> Shell
+    Shell -- " PLAY #lt;anything else#gt; " --> Shell
     Shell -- " INTERROGATE (no argument) " --> ErrInt1["ERROR 02<br/>Command requires at least one parameter"] --> Shell
     Shell -- " INTERROGATE (as admin) " --> ErrInt2["ERROR 07<br/>Unknown Employee"] --> Shell
     Shell -- " INTERROGATE (as regular user) " --> ErrInt3["ERROR 01<br/>Illegal attempt to initiate disciplinary action"] --> Shell
@@ -150,7 +150,7 @@ flowchart TD
     Shell -- " APPLY / APPLY.EXE " --> AppIntro
     Shell -- " THECAKEISALIE " --> Cake1
     Shell -- " LOGOUT / BYE / LOGOFF / VALVE " --> ExitLogout(["prints message,<br/>exits program"])
-    Shell -- " anything else " --> ErrNotFound["ERROR 24<br/>File '&lt;word&gt;' not found"] --> Shell
+    Shell -- " anything else " --> ErrNotFound["ERROR 24<br/>File '#lt;word#gt;' not found"] --> Shell
     AppIntro["APPLICATION intro:<br/>'Loaded: ENRICHMENT CENTER<br/>TEST SUBJECT APPLICATION PROCESS...'"] -- " QUIT " --> Shell
     AppIntro -- " CONTINUE " --> Uid["UID display screen"]
     Uid -- " QUIT " --> Shell
