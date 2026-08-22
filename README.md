@@ -118,7 +118,10 @@ matches the original: your only real exit there was closing the browser tab).
 ## Command / state tree
 
 Every screen the terminal can show, and every input that moves you between
-them. Error/rejection text is quoted verbatim.
+them. Error/rejection text is quoted verbatim. Split by section below so each
+diagram stays readable — `SHELL` is the shared hub they all return to.
+
+### Boot & login
 
 ```mermaid
 flowchart TD
@@ -134,34 +137,63 @@ flowchart TD
     Password -- " user ≠ CJOHNSON<br/>pass ≠ #quot;PORTAL#quot; / #quot;PORTALS#quot; " --> ErrPw2["ERROR 07<br/>Incorrect Password"] --> Password
     ShellAdmin --> Shell{{"SHELL"}}
     ShellUser --> Shell
-    Shell -- " DIR / CATALOG / DIRECTORY / LIST / LS / CAT " --> Dir["directory listing:<br/>APPLY.EXE (+ NOTES.EXE if admin)"] --> Shell
-    Shell -- " IP " --> Ip["#quot;uid:#lt;session id#gt;#quot;"] --> Shell
-    Shell -- " HELP / LIB / ? " --> HelpList["command list<br/>(+ NOTES if admin)"] --> Shell
-    Shell -- " APPEND / ATTRIB / COPY / FORMAT / ERASE / RENAME " --> ErrWrite["ERROR 15<br/>Disk is write protected"] --> Shell
-    Shell -- " PLAY (no argument) " --> ErrPlay["ERROR 03<br/>What would you like to play?"] --> Shell
-    Shell -- " PLAY PORTAL " --> ExitPlay(["prints message,<br/>exits program"])
-    Shell -- " PLAY #lt;anything else#gt; " --> Shell
-    Shell -- " INTERROGATE (no argument) " --> ErrInt1["ERROR 02<br/>Command requires at least one parameter"] --> Shell
-    Shell -- " INTERROGATE (as admin) " --> ErrInt2["ERROR 07<br/>Unknown Employee"] --> Shell
-    Shell -- " INTERROGATE (as regular user) " --> ErrInt3["ERROR 01<br/>Illegal attempt to initiate disciplinary action"] --> Shell
-    Shell -- " TAPEDISK " --> ErrTape["ERROR 18<br/>User not authorized to transfer system tapes"] --> Shell
-    Shell -- " NOTES / NOTES.EXE (as admin) " --> Notes1
-    Shell -- " NOTES (as regular user) " --> ErrNotes["ERROR 24<br/>File 'NOTES' not found"] --> Shell
-    Shell -- " APPLY / APPLY.EXE " --> AppIntro
-    Shell -- " THECAKEISALIE " --> Cake1
-    Shell -- " LOGOUT / BYE / LOGOFF / VALVE " --> ExitLogout(["prints message,<br/>exits program"])
-    Shell -- " anything else " --> ErrNotFound["ERROR 24<br/>File '#lt;word#gt;' not found"] --> Shell
-    AppIntro["APPLICATION intro:<br/>'Loaded: ENRICHMENT CENTER<br/>TEST SUBJECT APPLICATION PROCESS...'"] -- " QUIT " --> Shell
+```
+
+### Shell commands
+
+Once logged in, every command below is dispatched from the `SHELL` prompt
+(`ADMIN>` for admin, `B:\>` for a regular user) and — unless noted — returns
+straight back to it.
+
+| Command                                                      | Result                                                     |
+|--------------------------------------------------------------|------------------------------------------------------------|
+| `DIR` / `CATALOG` / `DIRECTORY` / `LIST` / `LS` / `CAT`      | directory listing: `APPLY.EXE` (+ `NOTES.EXE` if admin)    |
+| `IP`                                                         | prints `"uid:<session id>"`                                |
+| `HELP` / `LIB` / `?`                                         | command list (+ `NOTES` if admin)                          |
+| `APPEND` / `ATTRIB` / `COPY` / `FORMAT` / `ERASE` / `RENAME` | ERROR 15 — Disk is write protected                         |
+| `PLAY` (no argument)                                         | ERROR 03 — What would you like to play?                    |
+| `PLAY PORTAL`                                                | prints message, **exits program**                          |
+| `PLAY <anything else>`                                       | no-op                                                      |
+| `INTERROGATE` (no argument)                                  | ERROR 02 — Command requires at least one parameter         |
+| `INTERROGATE` (as admin)                                     | ERROR 07 — Unknown Employee                                |
+| `INTERROGATE` (as regular user)                              | ERROR 01 — Illegal attempt to initiate disciplinary action |
+| `TAPEDISK`                                                   | ERROR 18 — User not authorized to transfer system tapes    |
+| `NOTES` / `NOTES.EXE` (as admin)                             | opens [NOTES.EXE](#notesexe)                               |
+| `NOTES` (as regular user)                                    | ERROR 24 — File 'NOTES' not found                          |
+| `APPLY` / `APPLY.EXE`                                        | opens [APPLY.EXE](#applyexe)                               |
+| `THECAKEISALIE`                                              | opens the [CAKE monologue](#cake-and-bosskey)              |
+| `LOGOUT` / `BYE` / `LOGOFF` / `VALVE`                        | prints message, **exits program**                          |
+| anything else                                                | ERROR 24 — File '<word>' not found                         |
+
+### APPLY.EXE
+
+```mermaid
+flowchart TD
+    AppIntro["APPLICATION intro:<br/>'Loaded: ENRICHMENT CENTER<br/>TEST SUBJECT APPLICATION PROCESS...'"] -- " QUIT " --> Shell{{"SHELL"}}
     AppIntro -- " CONTINUE " --> Uid["UID display screen"]
     Uid -- " QUIT " --> Shell
     Uid -- " CONTINUE " --> Q1["Question 1"]
     Q1 -- " ... 50 questions total ...<br/>QUIT on any question → SHELL, form abandoned " --> Q50["Question 50"]
     Q50 -- " next Enter ends the form<br/>(answer never validated/submitted — quirk) " --> Congrats["'Congratulations! ...<br/>enter your 64 digit UIN(+L)'"]
-    Congrats -- " THECAKEISALIE " --> Cake1
+    Congrats -- " THECAKEISALIE " --> Cake1[["CAKE monologue<br/>(see below)"]]
     Congrats -- " anything else " --> DeadEnd["dead end:<br/>'UIN(+L) does not match'<br/>(only Ctrl+C escapes)"]
     Q1 -.- QRules["each question:<br/>TEXT → any input advances<br/>CHECKBOX/RADIO → number 1..N advances, else rejected"]
-    Notes1["NOTES.EXE page 1/4<br/>(history 1953–1996)"] -- " any keypress " --> Notes2["page 2"] -- " any keypress " --> Notes3["page 3"] -- " any keypress " --> Notes4["page 4<br/>'...In many ways...' [END]"]
-    Notes4 -- " any keypress " --> Shell
+```
+
+### NOTES.EXE
+
+```mermaid
+flowchart TD
+    Notes1["NOTES.EXE page 1/4<br/>(history 1953–1996)"] -- " any keypress " --> Notes2["page 2"]
+    Notes2 -- " any keypress " --> Notes3["page 3"]
+    Notes3 -- " any keypress " --> Notes4["page 4<br/>'...In many ways...' [END]"]
+    Notes4 -- " any keypress " --> Shell{{"SHELL"}}
+```
+
+### Cake and Bosskey
+
+```mermaid
+flowchart TD
     Cake1["CAKE monologue +<br/>security-feed placeholder"] -- " any keypress " --> Boss["BOSSKEY:<br/>disguised fake spreadsheet"]
     Boss -- " any keypress (loops forever) " --> Cake1
 ```
