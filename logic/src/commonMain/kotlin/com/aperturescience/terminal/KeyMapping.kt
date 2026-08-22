@@ -32,7 +32,8 @@ internal enum class NamedKey(
  */
 val NAMED_KEYS: Set<String> = NamedKey.entries.map { it.keyName }.toSet()
 
-internal fun isAcceptedChar(c: Char): Boolean = c.isDigit() || c.uppercaseChar() in 'A'..'Z' || c == ' ' || c == '?'
+internal fun isAcceptedChar(c: Char): Boolean =
+    c.isDigit() || c.uppercaseChar() in 'A'..'Z' || c == ' ' || c == '?' || c == '.'
 
 internal fun isAcceptedRawKey(
     namedKey: NamedKey?,

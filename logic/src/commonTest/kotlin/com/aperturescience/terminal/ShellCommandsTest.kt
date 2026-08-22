@@ -203,14 +203,13 @@ class ShellCommandsTest {
         }
 
     @Test
-    fun `a period cannot be typed at all - so NOTES-EXE degrades to NOTESEXE`() =
+    fun `NOTES-EXE is not found for a regular user`() =
         runTest {
-            // "." isn't an accepted character, so "NOTES.EXE" submits as "NOTESEXE" instead.
             val engine = loginToShell()
             submit(engine, "NOTES.EXE")
             assertTrue(
                 engine.state.value.displayText
-                    .contains("ERROR 24 [File 'NOTESEXE' not found]"),
+                    .contains("ERROR 24 [File 'NOTES.EXE' not found]"),
             )
         }
 
@@ -219,6 +218,17 @@ class ShellCommandsTest {
         runTest {
             val engine = loginAsAdmin()
             submit(engine, "NOTES")
+            assertTrue(
+                engine.state.value.displayText
+                    .contains("1953"),
+            )
+        }
+
+    @Test
+    fun `NOTES-EXE opens the reader for admin`() =
+        runTest {
+            val engine = loginAsAdmin()
+            submit(engine, "NOTES.EXE")
             assertTrue(
                 engine.state.value.displayText
                     .contains("1953"),
@@ -246,14 +256,13 @@ class ShellCommandsTest {
         }
 
     @Test
-    fun `a period cannot be typed at all - so APPLY-EXE degrades to APPLYEXE`() =
+    fun `APPLY-EXE also starts the job application`() =
         runTest {
-            // Same period-is-unreachable quirk as NOTES.EXE - "APPLY.EXE" can never actually be typed.
             val engine = loginToShell()
             submit(engine, "APPLY.EXE")
             assertTrue(
                 engine.state.value.displayText
-                    .contains("ERROR 24 [File 'APPLYEXE' not found]"),
+                    .contains("ENRICHMENT CENTER TEST SUBJECT APPLICATION"),
             )
         }
 

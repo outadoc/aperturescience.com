@@ -47,11 +47,20 @@ class InputHandlingTest {
     fun `punctuation other than question mark is rejected outright`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
-            for (key in listOf(".", ",", "!", "@", "#", "-", "_", "/", "'", "\"")) {
+            for (key in listOf(",", "!", "@", "#", "-", "_", "/", "'", "\"")) {
                 launch { engine.dispatch(Intent.KeyPressed(key)) }
             }
             advanceUntilIdle()
-            assertEquals("> ", engine.state.value.displayText, "no punctuation besides '?' should ever be accepted")
+            assertEquals("> ", engine.state.value.displayText, "no punctuation besides '?' and '.' should ever be accepted")
+        }
+
+    @Test
+    fun `a period is accepted so file names like NOTES-EXE can be typed`() =
+        runTest {
+            val engine = bootAndSettle(TerminalEngine())
+            for (c in "NOTES.EXE") launch { engine.dispatch(Intent.KeyPressed(c.toString())) }
+            advanceUntilIdle()
+            assertEquals("> NOTES.EXE", engine.state.value.displayText)
         }
 
     @Test
