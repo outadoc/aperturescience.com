@@ -74,6 +74,26 @@ body {
     color: inherit;
 }
 
+/* Invisible but focusable, so tapping the terminal on mobile summons the on-screen keyboard -
+   display:none/visibility:hidden would prevent focus. Zeroed out (not just opacity:0) since some
+   mobile browsers don't reliably hide a focused input via opacity alone; font-size must stay
+   >=16px or iOS Safari auto-zooms the viewport on focus. */
+#mobile-input {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0;
+    height: 0;
+    padding: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    font-size: 16px;
+}
+
 /* Hidden until the PLAY PORTAL easter egg fires (see Main.kt), then covers the terminal full-
    screen in place of logic's in-universe "[ERROR: TRAILER NOT FOUND]" fallback text. */
 #trailer {

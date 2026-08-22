@@ -14,9 +14,11 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLAnchorElement
+import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.HTMLPreElement
 import org.w3c.dom.HTMLVideoElement
 import org.w3c.dom.events.Event
+import org.w3c.dom.events.InputEvent
 import org.w3c.dom.events.KeyboardEvent
 
 /**
@@ -30,6 +32,7 @@ fun main() {
     val screen = document.getElementById(TERMINAL_ELEMENT_ID) as HTMLPreElement
     val trailer = document.getElementById(TRAILER_ELEMENT_ID) as HTMLVideoElement
     val securityVideo = document.getElementById(SECURITY_VIDEO_ELEMENT_ID) as HTMLVideoElement
+    val mobileInput = document.getElementById(MOBILE_INPUT_ELEMENT_ID) as HTMLInputElement
 
     scope.launch {
         engine.state.collectLatest { state ->
@@ -70,19 +73,61 @@ fun main() {
         )
     }
 
+    var previousMobileInputValue = ""
+
     // Explicitly-typed value, not an inline lambda, to sidestep overload ambiguity between
     // addEventListener's EventListener and (Event) -> Unit overloads.
     val onKeyDown: (Event) -> Unit = { event ->
         if (acceptingInput) {
+            val keyboardEvent = event as KeyboardEvent
             handleKeyDown(
-                event = event as KeyboardEvent,
+                event = keyboardEvent,
                 engine = engine,
                 scope = scope,
             )
+            // Mirrors the reducer's own input-buffer reset on submit, so the diffing in
+            // handleInput doesn't try to "undo" text that Enter already committed.
+            val isPlainEnter =
+                keyboardEvent.key == "Enter" &&
+                    !keyboardEvent.ctrlKey &&
+                    !keyboardEvent.metaKey &&
+                    !keyboardEvent.altKey
+            if (isPlainEnter) {
+                mobileInput.value = ""
+                previousMobileInputValue = ""
+            }
         }
     }
-
     window.addEventListener("keydown", onKeyDown)
+
+    // Mobile keyboards don't reliably report characters via keydown, so those go through this
+    // event instead - see handleInput for why it diffs mobileInput's value rather than trusting
+    // InputEvent.data/inputType.
+    val onInput: (Event) -> Unit = { event ->
+        val inputEvent = event as InputEvent
+        if (acceptingInput && !inputEvent.isComposing) {
+            previousMobileInputValue =
+                handleInput(
+                    mobileInput = mobileInput,
+                    previousValue = previousMobileInputValue,
+                    engine = engine,
+                    scope = scope,
+                )
+        }
+    }
+    mobileInput.addEventListener("input", onInput)
+
+    // Focuses mobileInput so tapping the terminal summons the on-screen keyboard on mobile;
+    // desktop already works without this since mobileInput is focused at boot below.
+    val onTerminalTap: (Event) -> Unit = {
+        if (acceptingInput) {
+            mobileInput.focus()
+        }
+    }
+    screen.addEventListener("click", onTerminalTap)
+    screen.addEventListener("touchend", onTerminalTap)
+
+    mobileInput.focus()
 
     scope.launch {
         engine.dispatch(Intent.Boot)
@@ -242,6 +287,7 @@ private fun showSecurityVideo(
 private const val TERMINAL_ELEMENT_ID = "terminal"
 private const val TRAILER_ELEMENT_ID = "trailer"
 private const val SECURITY_VIDEO_ELEMENT_ID = "security-video"
+private const val MOBILE_INPUT_ELEMENT_ID = "mobile-input"
 private const val VIDEO_VISIBLE_CLASS = "visible"
 
 /**
@@ -250,8 +296,10 @@ private const val VIDEO_VISIBLE_CLASS = "visible"
 private const val UNWRAPPED_WIDTH = Int.MAX_VALUE
 
 /**
- * Forwards plain keystrokes to [TerminalEngine.dispatch] as [Intent.KeyPressed]. Ctrl/Cmd/Alt
- * combos are left alone so browser/OS shortcuts (copy, devtools, refresh) keep working.
+ * Forwards named keys (Enter, PageUp/Down, ArrowLeft) to [TerminalEngine.dispatch] as
+ * [Intent.KeyPressed]. Printable characters and Backspace go through [handleInput] instead, since
+ * mobile keyboards don't reliably report them via `keydown`. Ctrl/Cmd/Alt combos are left alone so
+ * browser/OS shortcuts (copy, devtools, refresh) keep working.
  */
 private fun handleKeyDown(
     event: KeyboardEvent,
@@ -263,8 +311,37 @@ private fun handleKeyDown(
     }
 
     val key = event.key
-    if (key in NAMED_KEYS || key.length == 1) {
+    if (key in NAMED_KEYS && key != "Backspace") {
         event.preventDefault()
         scope.launch { engine.dispatch(Intent.KeyPressed(key)) }
     }
+}
+
+/**
+ * Diffs [mobileInput]'s value against [previousValue] to derive Backspace/character keystrokes -
+ * robust across mobile keyboards/IMEs, where `InputEvent.data`/`inputType` aren't reliable (and
+ * `data` isn't even exposed as nullable by this project's DOM bindings). Returns the value to
+ * pass back in as [previousValue] on the next call.
+ */
+private fun handleInput(
+    mobileInput: HTMLInputElement,
+    previousValue: String,
+    engine: TerminalEngine,
+    scope: CoroutineScope,
+): String {
+    val newValue = mobileInput.value
+    val commonPrefixLength = previousValue.commonPrefixWith(newValue).length
+    val backspaces = previousValue.length - commonPrefixLength
+    val inserted = newValue.substring(commonPrefixLength)
+
+    scope.launch {
+        repeat(backspaces) {
+            engine.dispatch(Intent.KeyPressed("Backspace"))
+        }
+        for (c in inserted) {
+            engine.dispatch(Intent.KeyPressed(c.toString()))
+        }
+    }
+
+    return newValue
 }
