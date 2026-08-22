@@ -1,3 +1,9 @@
+@font-face {
+    font-family: "Perfect DOS VGA 437";
+    src: url("fonts/perfect-dos-vga-437-win.ttf") format("truetype");
+    font-display: swap;
+}
+
 :root {
     color-scheme: light dark;
 
@@ -39,9 +45,17 @@ body {
 
     background: var(--bg);
     color: var(--fg);
-    font-family: "Courier New", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
-    font-size: 16px;
+    font-family: "Perfect DOS VGA 437", "Courier New", ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+    font-size: 20px;
     line-height: 1.35;
+
+    text-rendering: optimizeSpeed;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: grayscale;
+    font-smooth: never;
+    font-kerning: none;
+    font-variant-ligatures: none;
+    font-optical-sizing: none;
 
     caret-color: transparent;
 
@@ -132,5 +146,5 @@ noscript {
     display: block;
     padding: 24px;
     color: var(--fg);
-    font-family: monospace;
+    font-family: "Perfect DOS VGA 437", monospace;
 }
