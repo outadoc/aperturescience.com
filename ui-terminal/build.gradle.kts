@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.kotlin.plugin.compose)
     alias(libs.plugins.shadow)
 }
 
@@ -27,7 +26,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(project(":logic"))
-            implementation(libs.mosaic.runtime)
+            implementation(libs.mosaic.tty)
+            implementation(libs.mosaic.terminal)
+            implementation(libs.mosaic.tty.terminal)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
