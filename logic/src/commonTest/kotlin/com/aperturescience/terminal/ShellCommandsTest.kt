@@ -284,6 +284,7 @@ class ShellCommandsTest {
                     "[ERROR: STORE NOT FOUND]",
                     text.substring(annotation.range.first, annotation.range.last + 1),
                 )
+                assertEquals("", engine.state.value.input, "'$cmd' shouldn't echo back after the farewell message")
             }
         }
 
@@ -304,6 +305,7 @@ class ShellCommandsTest {
                 "[ERROR: TRAILER NOT FOUND]",
                 text.substring(annotation.range.first, annotation.range.last + 1),
             )
+            assertEquals("", engine.state.value.input, "'PLAY PORTAL' shouldn't echo back after the farewell message")
         }
 
     @Test

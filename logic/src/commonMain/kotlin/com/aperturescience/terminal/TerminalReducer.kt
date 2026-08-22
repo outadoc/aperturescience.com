@@ -771,6 +771,7 @@ object TerminalReducer {
             state.copy(
                 pageContent = "",
                 annotations = emptyList(),
+                input = "",
             )
 
         return Reduction(
