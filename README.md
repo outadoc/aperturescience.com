@@ -1,42 +1,35 @@
 # Aperture Science Terminal (Kotlin port)
 
 A Kotlin/JVM reimplementation of `ApertureScience17 (2007-10-17).swf`, the
-fake DOS-style terminal from the 2007 *Portal* ARG viral-marketing site
-(aperturescience.com). It reproduces the login flow, the "GLaDOS" shell,
-the 50-question fake job application, the `CJOHNSON` admin account and its
-`NOTES.EXE` corporate-history reader, and the `THECAKEISALIE` easter egg —
-including its quirks — in a real terminal, no Flash required.
+fake DOS terminal from the 2007 *Portal* ARG site (aperturescience.com).
 
-See [`../AGENTS.md`](../AGENTS.md) for how this was decompiled, extracted,
-and ported, and for the list of deliberate deviations from the original.
+- Reproduces the login flow, the "GLaDOS" shell, the 50-question fake job
+  application, the `CJOHNSON` admin account, `NOTES.EXE`, and the
+  `THECAKEISALIE` easter egg.
+- Runs in a real terminal — no Flash required.
+- See [`../AGENTS.md`](../AGENTS.md) for how this was decompiled and ported,
+  and for deliberate deviations from the original.
 
 ## Project structure
 
 Four Gradle modules:
 
-- **`logic/`** — the whole state machine (`TerminalEngine`), with no
-  dependency on Mosaic, Compose, or any other UI framework. Exposes a plain
-  `StateFlow<String>` (the currently-displayed screen) and a
+- **`logic/`** — the state machine (`TerminalEngine`). No UI framework
+  dependency. Exposes a `StateFlow<String>` (current screen) and
   `fun onKeyEvent(key: String, ctrl: Boolean): Boolean`.
-- **`ui-terminal/`** — the Mosaic-based terminal UI (depends on `logic`).
-  Collects the engine's `StateFlow` into a Compose `Text()` and forwards key
-  events into it. This is the module with the `application`/shadow-jar setup
-  and the `main()` entry point.
-- **`ui-web/`** — a browser/Compose-for-Web frontend (depends on `logic`).
-- **`ui-minitel/`** — a Minitel/Vidéotex frontend (depends on `logic`), built
-  on [minipavi-kotlin](https://github.com/outadoc/minipavi-kotlin). It's an
-  embedded Ktor server that speaks the [MiniPavi](https://www.minipavi.fr/)
-  gateway protocol: MiniPavi calls it once per user action and it renders one
-  Vidéotex frame in response. See [Running `ui-minitel`
-  locally](#running-ui-minitel-locally) below for how to exercise it with a
-  real (emulated) Minitel.
+- **`ui-terminal/`** — Mosaic-based terminal UI. Depends on `logic`. Has the
+  `main()` entry point and shadow-jar setup.
+- **`ui-web/`** — browser/Compose-for-Web frontend. Depends on `logic`.
+- **`ui-minitel/`** — Minitel/Vidéotex frontend, built on
+  [minipavi-kotlin](https://github.com/outadoc/minipavi-kotlin). An embedded
+  Ktor server speaking the [MiniPavi](https://www.minipavi.fr/) gateway
+  protocol. See [Running `ui-minitel` locally](#running-ui-minitel-locally).
 
 ## Requirements
 
 - JDK 21+
-- A real interactive terminal (this uses [Mosaic](https://github.com/JakeWharton/mosaic),
-  a Compose-for-terminal UI library, which needs a real TTY — it won't run
-  under a plain pipe or redirected output)
+- A real interactive terminal ([Mosaic](https://github.com/JakeWharton/mosaic)
+  needs a real TTY, not a pipe or redirected output)
 
 ## Build & run
 
@@ -44,7 +37,7 @@ Four Gradle modules:
 ./gradlew run
 ```
 
-or build a standalone fat jar:
+Or build a standalone fat jar:
 
 ```sh
 ./gradlew shadowJar
@@ -53,73 +46,61 @@ java -jar ui-terminal/build/libs/aperturescience-terminal-0.1.0-all.jar
 
 ## Testing
 
-`logic` has an automated unit test suite covering the whole state machine:
-
 ```sh
 ./gradlew :logic:test
 ```
 
-No real TTY needed — it runs in well under a second using
-`kotlinx-coroutines-test`'s virtual time, so even the 2313-choice question's
-pagination and a full 50-question run-through execute instantly. `ui-terminal`
-has no automated tests (Mosaic needs a real terminal); verify UI changes
-manually as described above.
+- `logic` has a full unit test suite covering the whole state machine.
+- Uses `kotlinx-coroutines-test` virtual time — no real TTY needed, runs in
+  under a second (including the 50-question run-through and the
+  2313-choice question's pagination).
+- `ui-terminal` has no automated tests (needs a real terminal) — verify UI
+  changes manually.
 
 ## Running `ui-minitel` locally
 
-`ui-minitel` doesn't talk Vidéotex over a serial line to a real Minitel — it
-speaks HTTP to a MiniPavi gateway, which is what actually terminates the
-Minitel/videotex protocol (over a real modem, or over the
-[websocket-based emulator](https://github.com/ludosevilla/minipavi/tree/master/emulminitel)
-used here). `ui-minitel/scripts/` sets up local instances of both, mirroring
-the [same setup in minipavi-kotlin](https://github.com/outadoc/minipavi-kotlin/tree/main/.docker):
+`ui-minitel` speaks HTTP to a MiniPavi gateway, which terminates the actual
+Minitel/Vidéotex protocol. `ui-minitel/scripts/` sets up local instances of
+both, mirroring [the same setup in
+minipavi-kotlin](https://github.com/outadoc/minipavi-kotlin/tree/main/.docker):
 
-- **`minipavi`** — the PHP gateway server, exposing a websocket on `:8182`
-  and calling out to your locally-running `ui-minitel` over HTTP.
-- **`emulminitel`** — a web-based Minitel emulator, served on `:8082`, that
-  connects to `minipavi`'s websocket.
+- **`minipavi`** — PHP gateway, websocket on `:8182`, calls `ui-minitel` over
+  HTTP.
+- **`emulminitel`** — web-based Minitel emulator on `:8082`, connects to
+  `minipavi`'s websocket.
 
 To try it out:
 
-1. Start `ui-minitel` itself (it listens on `:8080`):
+1. Start `ui-minitel` (listens on `:8080`):
    ```sh
    ./gradlew :ui-minitel:run
    ```
-2. In another terminal, build and start the gateway + emulator containers
-   with [Podman](https://podman.io/), and open the emulator in a browser tab
-   pointed at them:
+2. In another terminal, start the gateway + emulator containers with
+   [Podman](https://podman.io/) and open the emulator in a browser:
    ```sh
    ui-minitel/scripts/start.sh
    ```
-   This stays attached, streaming both containers' logs to stdout — handy
-   for watching the requests MiniPavi sends to `ui-minitel` — until you stop
-   it with Ctrl+C, which also stops the containers.
+   Stays attached, streaming both containers' logs. Ctrl+C stops it and the
+   containers.
+3. Tear everything down fully with `ui-minitel/scripts/stop.sh`.
 
-`ui-minitel/scripts/stop.sh` fully tears the containers and network back down.
-
-The program takes over the whole terminal on launch, like `vim` or `htop`
-(using the terminal's alternate-screen buffer) — whatever was on screen
-before is hidden while it runs and comes back exactly as it was when it
-exits.
-
-Press **Ctrl+C** at any time to exit — including from the `THECAKEISALIE`
-easter egg loop, which otherwise has no scripted way back to the shell (this
-matches the original: your only real exit there was closing the browser tab).
+The program takes over the whole terminal (alternate-screen buffer), like
+`vim` or `htop`. Press **Ctrl+C** any time to exit — including from the
+`THECAKEISALIE` loop, which has no other way back (matches the original).
 
 ## Input rules
 
-- Accepted characters: `0-9`, `A-Z` (letters are upper-cased as you type,
-  matching the original), space, and `?`. Everything else is ignored.
-- <kbd>Backspace</kbd> deletes the last character; <kbd>Enter</kbd> submits
-  the current line. Max input length is 65 characters.
-- Commands are matched **case-insensitively as typed** but compared
-  **exactly** — no abbreviations, no partial matches.
+- Accepted: `0-9`, `A-Z` (auto-uppercased), space, `?`. Everything else is
+  ignored.
+- <kbd>Backspace</kbd> deletes the last character; <kbd>Enter</kbd> submits.
+  Max input length: 65 characters.
+- Commands are matched case-insensitively but must match **exactly** — no
+  abbreviations, no partial matches.
 
 ## Command / state tree
 
-Every screen the terminal can show, and every input that moves you between
-them. Error/rejection text is quoted verbatim. Split by section below so each
-diagram stays readable — `SHELL` is the shared hub they all return to.
+Every screen and every input that moves between them. Error text is quoted
+verbatim. Split by section — `SHELL` is the shared hub they return to.
 
 ### Boot & login
 
@@ -141,9 +122,8 @@ flowchart TD
 
 ### Shell commands
 
-Once logged in, every command below is dispatched from the `SHELL` prompt
-(`ADMIN>` for admin, `B:\>` for a regular user) and — unless noted — returns
-straight back to it.
+From `SHELL` (`ADMIN>` for admin, `B:\>` for regular), every command below
+returns straight back to it unless noted.
 
 | Command                                                      | Result                                                     |
 |--------------------------------------------------------------|------------------------------------------------------------|
