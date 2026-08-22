@@ -1,0 +1,10 @@
+{
+  "name": "e2e-browser",
+  "version": "1.0.0",
+  "description": "Puppeteer driver for end-to-end testing ui-web in a real headless browser - see AGENTS.md",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "puppeteer-core": "^25.8.0"
+  }
+}

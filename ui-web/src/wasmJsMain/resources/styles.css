@@ -83,6 +83,21 @@ body {
     z-index: 2;
 }
 
+/* Hidden until the THECAKEISALIE easter egg's security-feed monologue fires, at which point
+   Main.kt splices this element directly into #terminal's text content, in place of the exact
+   span of logic's in-universe "[ERROR: SECURITY02.FLV NOT FOUND]" fallback text - it's meant to
+   read as an inline part of the transcript, not an overlay like #trailer. */
+#security-video {
+    display: none;
+}
+
+#security-video.visible {
+    display: block;
+    width: 320px;
+    max-width: 100%;
+    margin: 12px 0;
+}
+
 /* Subtle CRT scanline overlay for flavor - faint enough not to hurt legibility or fight the
    text-shadow glow above. */
 body::before {

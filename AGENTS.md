@@ -283,11 +283,14 @@ instead of Mosaic's `Text()`/`onKeyEvent`.
   module's* compile classpath even though `ui-terminal` never needed this
   fix itself (Mosaic's own `api`-scoped coroutines dependency was already
   covering it transitively there).
-- No headless browser is available in this dev environment (no Chrome,
-  Playwright, etc.), so full in-browser interactive testing hasn't been
-  done here - only code review plus the verification below. If testing this
-  UI further, prefer an actual browser (`:ui-web:wasmJsBrowserDevelopmentRun`
-  for a live-reloading dev server) over trying to shim one.
+- No browser (headless or otherwise) is installed in the sandboxed dev
+  environment this was first built in, so early work here relied on code
+  review plus the Node-based verification below. A real headless browser is
+  now available via a `distrobox` container - see "End-to-end browser
+  testing" below - and is the preferred way to verify any further `ui-web`
+  change, especially anything CSS/DOM-layout-related that Node-with-stubs
+  can't catch (e.g. an element rendering below the fold, a class never
+  actually getting applied).
 - What *has* been verified: `:logic:wasmJsD8Test` runs the full 76-test
   suite against the actual compiled Wasm binary via V8 (not a mock/stub of
   any kind) - strong evidence `:logic` behaves identically compiled to Wasm
@@ -310,6 +313,85 @@ instead of Mosaic's `Text()`/`onKeyEvent`.
   `document.getElementsByTagName`/`currentScript` before any application
   code runs at all - importing the raw `.mjs` sidesteps that entirely and
   is the easier thing to stub against.
+
+## End-to-end browser testing
+
+`ui-web` compiling and its unit tests passing doesn't prove much about how
+it actually *looks* - a CSS/layout bug (an element rendering hundreds of
+pixels below the fold, a `.visible` class that never actually gets applied)
+will sail through both. The sandboxed dev environment this project is
+often worked in has no browser installed at all, so a `distrobox` container
+is used to get a real headless Chromium instead of trying to shim one with
+Node + DOM stubs (that approach still has its place - see the "Web
+frontend: ui-web" section above - but it can't catch rendering/layout bugs
+by construction, only JS-logic-reaches-the-right-DOM-calls bugs).
+
+### One-time setup
+
+```sh
+distrobox create --name headless-browser --image debian:bookworm --yes
+distrobox enter headless-browser -- sudo apt-get update
+distrobox enter headless-browser -- sudo apt-get install -y chromium nodejs npm
+```
+
+Use a fresh container for this rather than reusing `apscience-swf` (the one
+from the decompilation work, see "What the SWF actually is" above) - it's
+for a different purpose and there's no reason to couple the two. `distrobox`
+shares the host's `$HOME` into the container by default, so paths line up
+identically on both sides.
+
+Then install the driver's one dependency (`puppeteer-core` - deliberately
+*not* plain `puppeteer`, which would download and manage its own Chromium
+instead of driving the one just installed via `apt`):
+
+```sh
+distrobox enter headless-browser -- bash -c \
+  "cd scripts/e2e-browser && npm install"
+```
+
+### Running it
+
+Start `ui-web`'s dev server on the host as usual, then drive it from inside
+the container (it reaches the host's `localhost` directly - `distrobox`
+containers share the host's network namespace):
+
+```sh
+./gradlew :ui-web:wasmJsBrowserDevelopmentRun &   # host, backgrounded
+distrobox enter headless-browser -- bash -c \
+  "cd scripts/e2e-browser && node driver.js my-scenario.json"
+```
+
+`driver.js` takes one argument: a JSON file describing the scenario as a
+list of steps (`nav`, `waitFor`, `sleep`, `type`, `press`, `screenshot`,
+`consoleErrors`) - see the doc comment at the top of the file for the full
+vocabulary and an example. Screenshots are the actual verification
+artifact: read them back with the `Read` tool to confirm the page looks
+right, don't just trust that the script ran without throwing.
+
+### Gotchas
+
+- **Keystrokes sent while the app is still revealing text are silently
+  dropped.** `TerminalEngine` locks input (`EngineState.isLocked`) until a
+  screen's reveal-animation finishes, and `reduceKeyPressed` no-ops on
+  every keystroke while locked - it doesn't queue them. A `type` step fired
+  on a fixed, too-short `sleep` after the previous step can land entirely
+  within that window and vanish with no error anywhere (this bit the very
+  first end-to-end run of this driver: a `LOGON`/`TESTER`/`PORTAL` login
+  sequence silently lost its last step and landed back on a *blank*
+  `Password>` prompt, which reads like a validation failure but was
+  actually just dropped input). Prefer a generous `sleep` (drop-in fix,
+  used above) or `waitFor` a selector/text that only appears once the
+  target screen has actually unlocked (more precise, not yet implemented
+  in `driver.js`) over guessing a shorter delay.
+- **`puppeteer-core` ships ESM-only** - `scripts/e2e-browser/package.json`
+  needs `"type": "module"` and `driver.js` uses `import`, not `require`.
+- **`--no-sandbox --disable-setuid-sandbox`** are required launch args
+  inside the container - Chromium's setuid sandbox needs privileges the
+  container doesn't have.
+- **`--autoplay-policy=no-user-gesture-required`** is needed to actually
+  observe `<video>` playback (e.g. the trailer/security-feed easter eggs) -
+  without it, Chromium's normal autoplay-blocking heuristics apply just
+  like in a real browser, and `HTMLMediaElement.play()` silently rejects.
 
 ## Minitel frontend: ui-minitel
 

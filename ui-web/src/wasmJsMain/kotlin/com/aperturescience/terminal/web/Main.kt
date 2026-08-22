@@ -28,14 +28,18 @@ fun main() {
 
     val screen = document.getElementById(TERMINAL_ELEMENT_ID) as HTMLPreElement
     val trailer = document.getElementById(TRAILER_ELEMENT_ID) as HTMLVideoElement
+    val securityVideo = document.getElementById(SECURITY_VIDEO_ELEMENT_ID) as HTMLVideoElement
 
     scope.launch {
         engine.state.collectLatest { state ->
             val blinkRange = state.annotations.firstOrNull { it.tag == BLINK_TAG }?.range
+            val securityVideoRange = state.annotations.firstOrNull { it.tag == EasterEgg.SECURITY_VIDEO.tag }?.range
             renderScreen(
                 screen = screen,
                 line = state.displayText,
                 blinkRange = blinkRange,
+                securityVideo = securityVideo,
+                securityVideoRange = securityVideoRange,
             )
 
             val isTrailerFired = state.annotations.any { it.tag == EasterEgg.TRAILER.tag }
@@ -44,11 +48,10 @@ fun main() {
                 show = isTrailerFired,
             )
 
-            // TODO: hook these up to a real store link and video embed - logic only tells us
-            // *which* easter egg fired, it stays oblivious to real-world URLs/media (see
-            // TextAnnotation.kt). For now these are unused - no-op hook points.
+            // TODO: hook this up to a real store link - logic only tells us *which* easter egg
+            // fired, it stays oblivious to real-world URLs/media (see TextAnnotation.kt). For now
+            // this is unused - a no-op hook point.
             state.annotations.firstOrNull { it.tag == EasterEgg.STORE.tag }
-            state.annotations.firstOrNull { it.tag == EasterEgg.SECURITY_VIDEO.tag }
         }
     }
 
@@ -89,16 +92,44 @@ fun main() {
 }
 
 /**
- * Plain [line] when there's nothing to blink; otherwise rebuilds [screen]'s children around a
- * `<span class="blink-text">` wrapping [blinkRange]. Phase-locked to the cursor's own blink
- * entirely via CSS (both read the same inherited `--blink-opacity`, see styles.css) - a span
- * created mid-session is in sync from its very first frame, no JS timing math needed.
+ * Plain [line] when there's nothing special to splice in; otherwise rebuilds [screen]'s children
+ * around whichever of [blinkRange]/[securityVideoRange] applies (never both at once - they cover
+ * unrelated screens). [securityVideoRange] takes priority since it *replaces* that span of text
+ * outright, not just decorates it: [securityVideo] is moved in as a real child of [screen] at
+ * that exact position, in place of `logic`'s in-universe "[ERROR: SECURITY02.FLV NOT FOUND]"
+ * fallback text, so it reads as an actual embedded clip in the transcript rather than an overlay
+ * (contrast `showTrailer`, which layers #trailer on top of the whole page via CSS instead).
+ * Blink is the lighter-weight case - a `<span class="blink-text">` wrapping [blinkRange]. Phase-
+ * locked to the cursor's own blink entirely via CSS (both read the same inherited
+ * `--blink-opacity`, see styles.css) - a span created mid-session is in sync from its very first
+ * frame, no JS timing math needed.
  */
 private fun renderScreen(
     screen: HTMLPreElement,
     line: String,
     blinkRange: IntRange?,
+    securityVideo: HTMLVideoElement,
+    securityVideoRange: IntRange?,
 ) {
+    val embedRange = securityVideoRange?.takeIf { it.last < line.length }
+    if (embedRange != null) {
+        showSecurityVideo(
+            securityVideo = securityVideo,
+            show = true,
+        )
+        while (screen.firstChild != null) {
+            screen.removeChild(screen.firstChild!!)
+        }
+        screen.appendChild(document.createTextNode(line.substring(0, embedRange.first)))
+        screen.appendChild(securityVideo)
+        screen.appendChild(document.createTextNode(line.substring(startIndex = embedRange.last + 1)))
+        return
+    }
+    showSecurityVideo(
+        securityVideo = securityVideo,
+        show = false,
+    )
+
     if (blinkRange == null || blinkRange.last >= line.length) {
         screen.textContent = line
         return
@@ -131,21 +162,23 @@ private fun renderScreen(
 }
 
 /**
- * Swaps [trailer] in over the terminal once the PLAY PORTAL easter egg fires - real playback,
- * in place of `logic`'s in-universe "[ERROR: TRAILER NOT FOUND]" fallback text. Reset (paused,
- * rewound) as soon as [show] goes false, so replaying the easter egg starts from the beginning.
+ * Toggles [trailer] in over the whole page once PLAY PORTAL fires - real playback, in place of
+ * `logic`'s in-universe "[ERROR: TRAILER NOT FOUND]" fallback text, as a fullscreen CSS overlay
+ * (`.visible`, see styles.css) rather than spliced into the transcript like `showSecurityVideo`.
+ * Reset (paused, rewound) as soon as [show] goes false, so replaying the easter egg starts from
+ * the beginning.
  */
 @OptIn(ExperimentalWasmJsInterop::class)
 private fun showTrailer(
     trailer: HTMLVideoElement,
     show: Boolean,
 ) {
-    if (show == trailer.classList.contains(TRAILER_VISIBLE_CLASS)) {
+    if (show == trailer.classList.contains(VIDEO_VISIBLE_CLASS)) {
         return
     }
 
     trailer.classList.toggle(
-        token = TRAILER_VISIBLE_CLASS,
+        token = VIDEO_VISIBLE_CLASS,
         force = show,
     )
 
@@ -159,9 +192,39 @@ private fun showTrailer(
     }
 }
 
+/**
+ * Companion to `renderScreen`'s embedding of [securityVideo]: flips the `.visible` class (styles
+ * .css relies on it to switch from `display: none` to a normal-flow 320px block) and starts/stops
+ * playback. Kept separate from [showTrailer] because unlike the trailer this element's *position*
+ * in the DOM is also managed by `renderScreen` - this function only ever touches its class and
+ * playback state, never moves it.
+ */
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun showSecurityVideo(
+    securityVideo: HTMLVideoElement,
+    show: Boolean,
+) {
+    if (show == securityVideo.classList.contains(VIDEO_VISIBLE_CLASS)) {
+        return
+    }
+
+    securityVideo.classList.toggle(
+        token = VIDEO_VISIBLE_CLASS,
+        force = show,
+    )
+
+    if (show) {
+        securityVideo.play()
+    } else {
+        securityVideo.pause()
+        securityVideo.currentTime = 0.0
+    }
+}
+
 private const val TERMINAL_ELEMENT_ID = "terminal"
 private const val TRAILER_ELEMENT_ID = "trailer"
-private const val TRAILER_VISIBLE_CLASS = "visible"
+private const val SECURITY_VIDEO_ELEMENT_ID = "security-video"
+private const val VIDEO_VISIBLE_CLASS = "visible"
 
 /**
  * Larger than any real line - just enough to keep word-wrapping from ever triggering.

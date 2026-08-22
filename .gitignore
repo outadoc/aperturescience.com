@@ -22,3 +22,6 @@ local.properties
 
 # OS cruft
 .DS_Store
+
+# scripts/e2e-browser (npm)
+node_modules/
