@@ -17,6 +17,7 @@ const val WRAP_WIDTH = 100
 private const val GLADOS_SPEED = 7
 private const val NOTES_SPEED = 3
 private const val MAX_NOTES_PAGE = 4
+private const val STORE_URL = "https://store.steampowered.com/app/400/Portal"
 
 /**
  * The pure core of `TerminalEngine`: every mode-transition/command-dispatch rule from the
@@ -550,7 +551,7 @@ object TerminalReducer {
             -> {
                 return farewell(
                     state = state,
-                    errorMessage = "ERROR: STORE NOT FOUND",
+                    content = STORE_URL,
                     easterEgg = EasterEgg.STORE,
                 )
             }
@@ -584,7 +585,7 @@ object TerminalReducer {
                     args.getOrNull(1) == Command.PORTAL -> {
                         return farewell(
                             state = state,
-                            errorMessage = "ERROR: TRAILER NOT FOUND",
+                            content = "[ERROR: TRAILER NOT FOUND]",
                             easterEgg = EasterEgg.TRAILER,
                         )
                     }
@@ -759,12 +760,14 @@ object TerminalReducer {
 
     /**
      * Ends the session in place of the original's browser navigation (LOGOUT/PLAY PORTAL), which
-     * a terminal can't perform - shown as an in-universe terminal error instead, tagged with
-     * [easterEgg] so a frontend that *can* act on it (e.g. `ui-web`) can tell which one fired.
+     * a terminal can't perform - reveals [content] tagged with [easterEgg] so a frontend that
+     * *can* act on it (e.g. `ui-web`) can tell which one fired. Callers decide the exact wording
+     * themselves (a bracketed in-universe error for TRAILER, a bare real URL for STORE) - this
+     * function only owns the reveal/tag/exit mechanics, not the content.
      */
     private fun farewell(
         state: EngineState,
-        errorMessage: String,
+        content: String,
         easterEgg: EasterEgg,
     ): Reduction {
         val cleared =
@@ -783,7 +786,7 @@ object TerminalReducer {
                         text =
                             buildString {
                                 appendLine()
-                                append(taggedSpan(easterEgg, "[$errorMessage]"))
+                                append(taggedSpan(easterEgg, content))
                                 appendLine()
                             },
                         delayMs = GLADOS_SPEED,

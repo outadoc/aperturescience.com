@@ -1,6 +1,7 @@
 package com.aperturescience.terminal.minitel
 
 import com.aperturescience.terminal.BLINK_TAG
+import com.aperturescience.terminal.EasterEgg
 import com.aperturescience.terminal.Intent
 import com.aperturescience.terminal.Mode
 import com.aperturescience.terminal.TerminalEngine
@@ -121,11 +122,12 @@ private fun render(
 
     val openInputZone = isLastChunk && !pendingDisconnect && hasOpenInputZone(state.mode)
     val blinkRange = state.annotations.firstOrNull { it.tag == BLINK_TAG }?.range
+    val storeRange = state.annotations.firstOrNull { it.tag == EasterEgg.STORE.tag }?.range
 
     val content =
         buildVideotex {
             clearAll()
-            lines.forEachIndexed { i, line -> appendLineWithBlink(line, lineOffsets[i], blinkRange) }
+            lines.forEachIndexed { i, line -> appendLineWithAnnotations(line, lineOffsets[i], blinkRange, storeRange) }
         }
 
     val command =
@@ -159,54 +161,73 @@ private fun render(
     )
 }
 
-internal data class LineBlinkSplit(
+internal data class LineRangeSplit(
     val before: String,
-    val blinking: String,
+    val marked: String,
     val after: String,
 )
 
 /**
  * Splits one rendered [line] (starting at [lineStart] in the full pageContent) around wherever
- * [blinkRange] intersects it, if at all. Kept independent of [VideotexBuilder] so the offset math
- * is testable without decoding Vidéotex escape bytes.
+ * [range] intersects it, if at all. Kept independent of [VideotexBuilder] so the offset math is
+ * testable without decoding Vidéotex escape bytes. Shared by every single-range annotation this
+ * frontend renders (blink, the STORE link's underline) - none of them ever co-occur on the same
+ * line, so a generic "one marked range per line" split is enough, no need to handle overlaps.
  */
-internal fun splitLineForBlink(
+internal fun splitLineForRange(
     line: String,
     lineStart: Int,
-    blinkRange: IntRange?,
-): LineBlinkSplit {
-    if (blinkRange == null) {
-        return LineBlinkSplit(line, "", "")
+    range: IntRange?,
+): LineRangeSplit {
+    if (range == null) {
+        return LineRangeSplit(line, "", "")
     }
 
     val lineEndExclusive = lineStart + line.length
-    val start = maxOf(blinkRange.first, lineStart)
-    val endExclusive = minOf(blinkRange.last + 1, lineEndExclusive)
+    val start = maxOf(range.first, lineStart)
+    val endExclusive = minOf(range.last + 1, lineEndExclusive)
     if (start >= endExclusive) {
-        return LineBlinkSplit(line, "", "")
+        return LineRangeSplit(line, "", "")
     }
 
     val localStart = start - lineStart
     val localEnd = endExclusive - lineStart
 
-    return LineBlinkSplit(
+    return LineRangeSplit(
         before = line.substring(0, localStart),
-        blinking = line.substring(localStart, localEnd),
+        marked = line.substring(localStart, localEnd),
         after = line.substring(localEnd),
     )
 }
 
-private fun VideotexBuilder.appendLineWithBlink(
+/**
+ * Applies whichever of [blinkRange]/[storeRange] intersects [line] (never both - they cover
+ * unrelated screens): blink wraps its span in [VideotexBuilder.withBlink], the STORE link's span
+ * in [VideotexBuilder.withUnderline] - Minitel has no way to actually follow a link, so this is
+ * as far as that easter egg goes here.
+ */
+private fun VideotexBuilder.appendLineWithAnnotations(
     line: String,
     lineStart: Int,
     blinkRange: IntRange?,
+    storeRange: IntRange?,
 ) {
-    val split = splitLineForBlink(line, lineStart, blinkRange)
-    append(split.before)
-    if (split.blinking.isNotEmpty()) {
+    val blinkSplit = splitLineForRange(line, lineStart, blinkRange)
+    if (blinkSplit.marked.isNotEmpty()) {
+        append(blinkSplit.before)
         withBlink {
-            append(split.blinking)
+            append(blinkSplit.marked)
+        }
+        appendLine(blinkSplit.after)
+        return
+    }
+
+    val storeSplit = splitLineForRange(line, lineStart, storeRange)
+    append(storeSplit.before)
+    if (storeSplit.marked.isNotEmpty()) {
+        withUnderline {
+            append(storeSplit.marked)
         }
     }
-    appendLine(split.after)
+    appendLine(storeSplit.after)
 }

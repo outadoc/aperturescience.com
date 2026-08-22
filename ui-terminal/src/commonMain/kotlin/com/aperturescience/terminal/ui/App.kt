@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.aperturescience.terminal.BLINK_TAG
+import com.aperturescience.terminal.EasterEgg
 import com.aperturescience.terminal.Intent
 import com.aperturescience.terminal.TerminalEngine
 import com.aperturescience.terminal.WRAP_WIDTH
@@ -21,6 +22,7 @@ import com.jakewharton.mosaic.text.SpanStyle
 import com.jakewharton.mosaic.text.buildAnnotatedString
 import com.jakewharton.mosaic.ui.Text
 import com.jakewharton.mosaic.ui.TextStyle
+import com.jakewharton.mosaic.ui.UnderlineStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
@@ -43,6 +45,7 @@ fun App(engine: TerminalEngine) {
     val state by engine.state.collectAsState()
     val liveLine = state.displayText
     val blinkRange = state.annotations.firstOrNull { it.tag == BLINK_TAG }?.range
+    val storeRange = state.annotations.firstOrNull { it.tag == EasterEgg.STORE.tag }?.range
 
     // Mosaic's TextStyle has no true blink attribute - fake it by toggling Invert on the marked
     // span on a timer instead.
@@ -66,11 +69,18 @@ fun App(engine: TerminalEngine) {
             true
         }
 
-    if (blinkRange != null && blinkRange.last < liveLine.length) {
+    val isBlinkVisible = blinkRange != null && blinkRange.last < liveLine.length
+    val isStoreLinkVisible = storeRange != null && storeRange.last < liveLine.length
+    if (isBlinkVisible || isStoreLinkVisible) {
         val annotatedLine =
             buildAnnotatedString {
                 append(liveLine)
-                if (blinkOn) addStyle(SpanStyle(textStyle = TextStyle.Invert), blinkRange.first, blinkRange.last + 1)
+                if (blinkRange != null && blinkOn) {
+                    addStyle(SpanStyle(textStyle = TextStyle.Invert), blinkRange.first, blinkRange.last + 1)
+                }
+                if (storeRange != null) {
+                    addStyle(SpanStyle(underlineStyle = UnderlineStyle.Straight), storeRange.first, storeRange.last + 1)
+                }
             }
         Text(value = annotatedLine, modifier = modifier)
     } else {

@@ -67,6 +67,13 @@ body {
     opacity: var(--blink-opacity, 1);
 }
 
+/* The STORE easter egg's real link (Main.kt wraps it in an <a> once revealed) - inherits the
+   terminal's own green rather than the browser default blue, keeping the underline as the only
+   "this is clickable" cue so it still reads as part of the transcript. */
+#terminal a {
+    color: inherit;
+}
+
 /* Hidden until the PLAY PORTAL easter egg fires (see Main.kt), then covers the terminal full-
    screen in place of logic's in-universe "[ERROR: TRAILER NOT FOUND]" fallback text. */
 #trailer {

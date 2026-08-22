@@ -29,7 +29,9 @@ const val BLINK_TAG = "blink"
  * apart and render (or not) however fits its medium. `logic` still never interprets [tag] beyond
  * that: it's this enum, not real URLs/media, that `logic` knows about.
  */
-enum class EasterEgg(val tag: String) {
+enum class EasterEgg(
+    val tag: String,
+) {
     STORE("easter-egg-store"),
     TRAILER("easter-egg-trailer"),
     SECURITY_VIDEO("easter-egg-security-video"),

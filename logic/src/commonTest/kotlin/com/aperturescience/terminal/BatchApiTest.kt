@@ -132,7 +132,7 @@ class BatchApiTest {
             assertTrue(engine.state.value.exitRequested)
             assertTrue(
                 engine.state.value.displayText
-                    .contains("ERROR: STORE NOT FOUND"),
+                    .contains("https://store.steampowered.com/app/400/Portal"),
             )
             assertTrue(
                 engine.state.value.annotations

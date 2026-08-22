@@ -51,7 +51,11 @@ class InputHandlingTest {
                 launch { engine.dispatch(Intent.KeyPressed(key)) }
             }
             advanceUntilIdle()
-            assertEquals("> ", engine.state.value.displayText, "no punctuation besides '?' and '.' should ever be accepted")
+            assertEquals(
+                "> ",
+                engine.state.value.displayText,
+                "no punctuation besides '?' and '.' should ever be accepted",
+            )
         }
 
     @Test

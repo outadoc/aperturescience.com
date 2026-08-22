@@ -275,13 +275,13 @@ class ShellCommandsTest {
                 assertTrue(engine.state.value.exitRequested, "expected exitRequested after '$cmd'")
 
                 val text = engine.state.value.displayText
-                assertTrue(text.contains("[ERROR: STORE NOT FOUND]"))
+                assertTrue(text.contains("https://store.steampowered.com/app/400/Portal"))
 
                 val annotation =
                     engine.state.value.annotations
                         .single { it.tag == EasterEgg.STORE.tag }
                 assertEquals(
-                    "[ERROR: STORE NOT FOUND]",
+                    "https://store.steampowered.com/app/400/Portal",
                     text.substring(annotation.range.first, annotation.range.last + 1),
                 )
                 assertEquals("", engine.state.value.input, "'$cmd' shouldn't echo back after the farewell message")

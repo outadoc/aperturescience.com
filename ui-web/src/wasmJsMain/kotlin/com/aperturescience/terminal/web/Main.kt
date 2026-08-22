@@ -13,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import org.w3c.dom.HTMLAnchorElement
 import org.w3c.dom.HTMLPreElement
 import org.w3c.dom.HTMLVideoElement
 import org.w3c.dom.events.Event
@@ -33,11 +34,13 @@ fun main() {
     scope.launch {
         engine.state.collectLatest { state ->
             val blinkRange = state.annotations.firstOrNull { it.tag == BLINK_TAG }?.range
+            val storeRange = state.annotations.firstOrNull { it.tag == EasterEgg.STORE.tag }?.range
             val securityVideoRange = state.annotations.firstOrNull { it.tag == EasterEgg.SECURITY_VIDEO.tag }?.range
             renderScreen(
                 screen = screen,
                 line = state.displayText,
                 blinkRange = blinkRange,
+                storeRange = storeRange,
                 securityVideo = securityVideo,
                 securityVideoRange = securityVideoRange,
             )
@@ -47,11 +50,6 @@ fun main() {
                 trailer = trailer,
                 show = isTrailerFired,
             )
-
-            // TODO: hook this up to a real store link - logic only tells us *which* easter egg
-            // fired, it stays oblivious to real-world URLs/media (see TextAnnotation.kt). For now
-            // this is unused - a no-op hook point.
-            state.annotations.firstOrNull { it.tag == EasterEgg.STORE.tag }
         }
     }
 
@@ -93,21 +91,24 @@ fun main() {
 
 /**
  * Plain [line] when there's nothing special to splice in; otherwise rebuilds [screen]'s children
- * around whichever of [blinkRange]/[securityVideoRange] applies (never both at once - they cover
- * unrelated screens). [securityVideoRange] takes priority since it *replaces* that span of text
- * outright, not just decorates it: [securityVideo] is moved in as a real child of [screen] at
- * that exact position, in place of `logic`'s in-universe "[ERROR: SECURITY02.FLV NOT FOUND]"
- * fallback text, so it reads as an actual embedded clip in the transcript rather than an overlay
- * (contrast `showTrailer`, which layers #trailer on top of the whole page via CSS instead).
- * Blink is the lighter-weight case - a `<span class="blink-text">` wrapping [blinkRange]. Phase-
- * locked to the cursor's own blink entirely via CSS (both read the same inherited
- * `--blink-opacity`, see styles.css) - a span created mid-session is in sync from its very first
- * frame, no JS timing math needed.
+ * around whichever of [blinkRange]/[storeRange]/[securityVideoRange] applies (never more than one
+ * at once - they cover unrelated screens). [securityVideoRange] takes priority since it
+ * *replaces* that span of text outright, not just decorates it: [securityVideo] is moved in as a
+ * real child of [screen] at that exact position, in place of `logic`'s in-universe "[ERROR:
+ * SECURITY02.FLV NOT FOUND]" fallback text, so it reads as an actual embedded clip in the
+ * transcript rather than an overlay (contrast `showTrailer`, which layers #trailer on top of the
+ * whole page via CSS instead). [storeRange] is next - `logic` reveals the real Steam URL as
+ * plain text for this one (see `TerminalReducer.STORE_URL`), so it's wrapped in a real `<a>`
+ * rather than replaced. Blink is the lighter-weight case - a `<span class="blink-text">`
+ * wrapping [blinkRange]. Phase-locked to the cursor's own blink entirely via CSS (both read the
+ * same inherited `--blink-opacity`, see styles.css) - a span created mid-session is in sync from
+ * its very first frame, no JS timing math needed.
  */
 private fun renderScreen(
     screen: HTMLPreElement,
     line: String,
     blinkRange: IntRange?,
+    storeRange: IntRange?,
     securityVideo: HTMLVideoElement,
     securityVideoRange: IntRange?,
 ) {
@@ -129,6 +130,23 @@ private fun renderScreen(
         securityVideo = securityVideo,
         show = false,
     )
+
+    val linkRange = storeRange?.takeIf { it.last < line.length }
+    if (linkRange != null) {
+        while (screen.firstChild != null) {
+            screen.removeChild(screen.firstChild!!)
+        }
+        screen.appendChild(document.createTextNode(line.substring(0, linkRange.first)))
+        val url = line.substring(startIndex = linkRange.first, endIndex = linkRange.last + 1)
+        val anchor = document.createElement("a") as HTMLAnchorElement
+        anchor.href = url
+        anchor.textContent = url
+        anchor.target = "_blank"
+        anchor.rel = "noopener noreferrer"
+        screen.appendChild(anchor)
+        screen.appendChild(document.createTextNode(line.substring(startIndex = linkRange.last + 1)))
+        return
+    }
 
     if (blinkRange == null || blinkRange.last >= line.length) {
         screen.textContent = line
