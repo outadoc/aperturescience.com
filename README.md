@@ -12,7 +12,7 @@ fake DOS terminal from the 2007 *Portal* ARG site (aperturescience.com).
 
 ## Project structure
 
-Four Gradle modules:
+Five Gradle modules:
 
 - **`logic/`** — the state machine (`TerminalEngine`). No UI framework
   dependency. Exposes a `StateFlow<String>` (current screen) and
@@ -24,6 +24,13 @@ Four Gradle modules:
   [minipavi-kotlin](https://github.com/outadoc/minipavi-kotlin). An embedded
   Ktor server speaking the [MiniPavi](https://www.minipavi.fr/) gateway
   protocol. See [Running `ui-minitel` locally](#running-ui-minitel-locally).
+- **`ui-telnet/`** — telnet server frontend, built on
+  [Ktor Network](https://ktor.io/docs/servers-raw-sockets.html)'s raw
+  sockets. Depends on `logic`. One `TerminalEngine` per connection, same
+  real-time keystroke feel as `ui-terminal` (live backspace, arrow-left nav,
+  per-keystroke password masking) but reachable remotely by multiple
+  concurrent telnet clients. See [Running `ui-telnet`
+  locally](#running-ui-telnet-locally).
 
 ## Requirements
 
@@ -43,6 +50,10 @@ Or build a standalone fat jar:
 ./gradlew shadowJar
 java -jar ui-terminal/build/libs/aperturescience-terminal-0.1.0-all.jar
 ```
+
+`ui-terminal` takes over the whole terminal (alternate-screen buffer), like
+`vim` or `htop`. Press **Ctrl+C** any time to exit — including from the
+`THECAKEISALIE` loop, which has no other way back (matches the original).
 
 ## Testing
 
@@ -84,9 +95,24 @@ To try it out:
    containers.
 3. Tear everything down fully with `ui-minitel/scripts/stop.sh`.
 
-The program takes over the whole terminal (alternate-screen buffer), like
-`vim` or `htop`. Press **Ctrl+C** any time to exit — including from the
-`THECAKEISALIE` loop, which has no other way back (matches the original).
+## Running `ui-telnet` locally
+
+```sh
+./gradlew :ui-telnet:run
+```
+
+Listens on `:2323` (plain telnet has no encryption — don't expose this
+directly to the internet without something like `stunnel` in front of it).
+In another terminal:
+
+```sh
+telnet localhost 2323
+```
+
+Each connection gets its own session — feels just like running `ui-terminal`
+locally (live backspace, arrow-left navigation, password masked as you type),
+except multiple people can connect at once. `LOGOUT`/`PLAY PORTAL` closes the
+connection cleanly; Ctrl+C disconnects immediately.
 
 ## Input rules
 
