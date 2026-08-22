@@ -85,8 +85,7 @@ fun main() {
                 engine = engine,
                 scope = scope,
             )
-            // Mirrors the reducer's own input-buffer reset on submit, so the diffing in
-            // handleInput doesn't try to "undo" text that Enter already committed.
+            // Mirrors the reducer's own input-buffer reset on submit.
             val isPlainEnter =
                 keyboardEvent.key == "Enter" &&
                     !keyboardEvent.ctrlKey &&
@@ -100,9 +99,7 @@ fun main() {
     }
     window.addEventListener("keydown", onKeyDown)
 
-    // Mobile keyboards don't reliably report characters via keydown, so those go through this
-    // event instead - see handleInput for why it diffs mobileInput's value rather than trusting
-    // InputEvent.data/inputType.
+    // Mobile keyboards don't reliably report characters via keydown - see handleInput.
     val onInput: (Event) -> Unit = { event ->
         val inputEvent = event as InputEvent
         if (acceptingInput && !inputEvent.isComposing) {
@@ -117,8 +114,7 @@ fun main() {
     }
     mobileInput.addEventListener("input", onInput)
 
-    // Focuses mobileInput so tapping the terminal summons the on-screen keyboard on mobile;
-    // desktop already works without this since mobileInput is focused at boot below.
+    // Summons the mobile keyboard on tap; desktop is already focused at boot below.
     val onTerminalTap: (Event) -> Unit = {
         if (acceptingInput) {
             mobileInput.focus()
@@ -296,10 +292,7 @@ private const val VIDEO_VISIBLE_CLASS = "visible"
 private const val UNWRAPPED_WIDTH = Int.MAX_VALUE
 
 /**
- * Forwards named keys (Enter, PageUp/Down, ArrowLeft) to [TerminalEngine.dispatch] as
- * [Intent.KeyPressed]. Printable characters and Backspace go through [handleInput] instead, since
- * mobile keyboards don't reliably report them via `keydown`. Ctrl/Cmd/Alt combos are left alone so
- * browser/OS shortcuts (copy, devtools, refresh) keep working.
+ * Forwards named keys to [Intent.KeyPressed]; printable chars/Backspace go through [handleInput].
  */
 private fun handleKeyDown(
     event: KeyboardEvent,
@@ -318,10 +311,7 @@ private fun handleKeyDown(
 }
 
 /**
- * Diffs [mobileInput]'s value against [previousValue] to derive Backspace/character keystrokes -
- * robust across mobile keyboards/IMEs, where `InputEvent.data`/`inputType` aren't reliable (and
- * `data` isn't even exposed as nullable by this project's DOM bindings). Returns the value to
- * pass back in as [previousValue] on the next call.
+ * Diffs [mobileInput]'s value against [previousValue] to derive keystrokes; returns the new value.
  */
 private fun handleInput(
     mobileInput: HTMLInputElement,

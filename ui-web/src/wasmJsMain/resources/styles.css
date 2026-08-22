@@ -74,10 +74,7 @@ body {
     color: inherit;
 }
 
-/* Invisible but focusable, so tapping the terminal on mobile summons the on-screen keyboard -
-   display:none/visibility:hidden would prevent focus. Zeroed out (not just opacity:0) since some
-   mobile browsers don't reliably hide a focused input via opacity alone; font-size must stay
-   >=16px or iOS Safari auto-zooms the viewport on focus. */
+/* Invisible but focusable - summons the mobile keyboard on tap without being visible itself. */
 #mobile-input {
     position: fixed;
     top: 0;
