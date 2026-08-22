@@ -17,7 +17,6 @@ import org.w3c.dom.HTMLPreElement
 import org.w3c.dom.HTMLVideoElement
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
-import kotlin.js.ExperimentalWasmJsInterop
 
 /**
  * Web counterpart to `ui-terminal`'s `App.kt`/`AppRunner.kt`: no shared UI layer (Mosaic has no
@@ -33,10 +32,17 @@ fun main() {
     scope.launch {
         engine.state.collectLatest { state ->
             val blinkRange = state.annotations.firstOrNull { it.tag == BLINK_TAG }?.range
-            renderScreen(screen, state.displayText, blinkRange)
+            renderScreen(
+                screen = screen,
+                line = state.displayText,
+                blinkRange = blinkRange,
+            )
 
-            val trailerFired = state.annotations.any { it.tag == EasterEgg.TRAILER.tag }
-            showTrailer(trailer, trailerFired)
+            val isTrailerFired = state.annotations.any { it.tag == EasterEgg.TRAILER.tag }
+            showTrailer(
+                trailer = trailer,
+                show = isTrailerFired,
+            )
 
             // TODO: hook these up to a real store link and video embed - logic only tells us
             // *which* easter egg fired, it stays oblivious to real-world URLs/media (see
@@ -55,16 +61,31 @@ fun main() {
 
     // No hard-wrapping needed - CSS's `white-space: pre-wrap` handles it, and unlike a fixed
     // character count, responds to window resizes.
-    scope.launch { engine.dispatch(Intent.ViewportResized(UNWRAPPED_WIDTH)) }
+    scope.launch {
+        engine.dispatch(
+            Intent.ViewportResized(
+                columns = UNWRAPPED_WIDTH,
+            ),
+        )
+    }
 
     // Explicitly-typed value, not an inline lambda, to sidestep overload ambiguity between
     // addEventListener's EventListener and (Event) -> Unit overloads.
     val onKeyDown: (Event) -> Unit = { event ->
-        if (acceptingInput) handleKeyDown(event as KeyboardEvent, engine, scope)
+        if (acceptingInput) {
+            handleKeyDown(
+                event = event as KeyboardEvent,
+                engine = engine,
+                scope = scope,
+            )
+        }
     }
+
     window.addEventListener("keydown", onKeyDown)
 
-    scope.launch { engine.dispatch(Intent.Boot) }
+    scope.launch {
+        engine.dispatch(Intent.Boot)
+    }
 }
 
 /**
@@ -82,13 +103,31 @@ private fun renderScreen(
         screen.textContent = line
         return
     }
-    while (screen.firstChild != null) screen.removeChild(screen.firstChild!!)
-    screen.appendChild(document.createTextNode(line.substring(0, blinkRange.first)))
+    while (screen.firstChild != null) {
+        screen.removeChild(screen.firstChild!!)
+    }
+
+    screen.appendChild(
+        document.createTextNode(
+            line.substring(0, blinkRange.first),
+        ),
+    )
+
     val span = document.createElement("span")
     span.className = "blink-text"
-    span.textContent = line.substring(blinkRange.first, blinkRange.last + 1)
+    span.textContent =
+        line.substring(
+            startIndex = blinkRange.first,
+            endIndex = blinkRange.last + 1,
+        )
     screen.appendChild(span)
-    screen.appendChild(document.createTextNode(line.substring(blinkRange.last + 1)))
+    screen.appendChild(
+        document.createTextNode(
+            line.substring(
+                startIndex = blinkRange.last + 1,
+            ),
+        ),
+    )
 }
 
 /**
@@ -101,8 +140,15 @@ private fun showTrailer(
     trailer: HTMLVideoElement,
     show: Boolean,
 ) {
-    if (show == trailer.classList.contains(TRAILER_VISIBLE_CLASS)) return
-    trailer.classList.toggle(TRAILER_VISIBLE_CLASS, show)
+    if (show == trailer.classList.contains(TRAILER_VISIBLE_CLASS)) {
+        return
+    }
+
+    trailer.classList.toggle(
+        token = TRAILER_VISIBLE_CLASS,
+        force = show,
+    )
+
     if (show) {
         // Autoplay this many reveal-effect ticks after the triggering keypress may not count as
         // "user activation" to the browser - if it's blocked, `controls` lets the user hit play.
@@ -131,7 +177,10 @@ private fun handleKeyDown(
     engine: TerminalEngine,
     scope: CoroutineScope,
 ) {
-    if (event.ctrlKey || event.metaKey || event.altKey) return
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+        return
+    }
+
     val key = event.key
     if (key in NAMED_KEYS || key.length == 1) {
         event.preventDefault()
