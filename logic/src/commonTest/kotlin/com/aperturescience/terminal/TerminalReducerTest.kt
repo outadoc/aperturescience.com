@@ -39,6 +39,24 @@ class TerminalReducerTest {
     }
 
     @Test
+    fun `CharacterRevealed opens an easter-egg annotation on its start char and closes it on the shared BLINK_END`() {
+        var state = baseState.copy(pageContent = "abc")
+        val storeStartChar = EASTER_EGG_START_CHAR.getValue(EasterEgg.STORE)
+        state = TerminalReducer.reduce(state, Intent.CharacterRevealed(storeStartChar)).state
+        assertEquals(3, state.pendingAnnotationStart)
+        assertEquals(EasterEgg.STORE.tag, state.pendingAnnotationTag)
+
+        for (c in "XY") {
+            state = TerminalReducer.reduce(state, Intent.CharacterRevealed(c)).state
+        }
+        state = TerminalReducer.reduce(state, Intent.CharacterRevealed(BLINK_END)).state
+
+        assertEquals(listOf(TextAnnotation(EasterEgg.STORE.tag, 3 until 5)), state.annotations)
+        assertNull(state.pendingAnnotationStart)
+        assertNull(state.pendingAnnotationTag)
+    }
+
+    @Test
     fun `LineSubmitted THECAKEISALIE emits a two-part reveal effect sequence with a wait between them`() {
         val shellState = baseState.copy(mode = Mode.Shell())
         val reduction = TerminalReducer.reduce(shellState, Intent.LineSubmitted("THECAKEISALIE"))

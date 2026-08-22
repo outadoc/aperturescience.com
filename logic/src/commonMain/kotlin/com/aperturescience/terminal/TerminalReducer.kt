@@ -90,29 +90,32 @@ object TerminalReducer {
         state: EngineState,
         char: Char,
     ): Reduction =
-        when (char) {
-            BLINK_START -> {
+        when {
+            char in START_CHAR_TO_TAG -> {
                 Reduction(
                     state.copy(
                         pendingAnnotationStart = state.pageContent.length,
+                        pendingAnnotationTag = START_CHAR_TO_TAG.getValue(char),
                     ),
                 )
             }
 
-            BLINK_END -> {
+            char == BLINK_END -> {
                 val start = state.pendingAnnotationStart
+                val tag = state.pendingAnnotationTag
                 Reduction(
-                    if (start == null) {
+                    if (start == null || tag == null) {
                         state
                     } else {
                         state.copy(
                             annotations =
                                 state.annotations +
                                     TextAnnotation(
-                                        tag = BLINK_TAG,
+                                        tag = tag,
                                         range = start until state.pageContent.length,
                                     ),
                             pendingAnnotationStart = null,
+                            pendingAnnotationTag = null,
                         )
                     },
                 )
@@ -548,6 +551,7 @@ object TerminalReducer {
                 return farewell(
                     state = state,
                     errorMessage = "ERROR: STORE NOT FOUND",
+                    easterEgg = EasterEgg.STORE,
                 )
             }
 
@@ -581,6 +585,7 @@ object TerminalReducer {
                         return farewell(
                             state = state,
                             errorMessage = "ERROR: TRAILER NOT FOUND",
+                            easterEgg = EasterEgg.TRAILER,
                         )
                     }
                 }
@@ -753,12 +758,14 @@ object TerminalReducer {
         )
 
     /**
-     * Ends the session in place of the original's browser navigation (LOGOUT/PLAY PORTAL),
-     * which a terminal can't perform - shown as an in-universe terminal error instead.
+     * Ends the session in place of the original's browser navigation (LOGOUT/PLAY PORTAL), which
+     * a terminal can't perform - shown as an in-universe terminal error instead, tagged with
+     * [easterEgg] so a frontend that *can* act on it (e.g. `ui-web`) can tell which one fired.
      */
     private fun farewell(
         state: EngineState,
         errorMessage: String,
+        easterEgg: EasterEgg,
     ): Reduction {
         val cleared =
             state.copy(
@@ -775,9 +782,7 @@ object TerminalReducer {
                         text =
                             buildString {
                                 appendLine()
-                                append("[")
-                                append(errorMessage)
-                                append("]")
+                                append(taggedSpan(easterEgg, "[$errorMessage]"))
                                 appendLine()
                             },
                         delayMs = GLADOS_SPEED,
@@ -1084,7 +1089,7 @@ object TerminalReducer {
                 "out this security feed.",
             "Whatever the hell a 'relaxation vault' is, it doesn't have any doors.",
             "",
-            "[ERROR: SECURITY02.FLV NOT FOUND]",
+            taggedSpan(EasterEgg.SECURITY_VIDEO, "[ERROR: SECURITY02.FLV NOT FOUND]"),
             "",
         ).joinToString("\n")
 

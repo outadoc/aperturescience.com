@@ -1,6 +1,7 @@
 package com.aperturescience.terminal.web
 
 import com.aperturescience.terminal.BLINK_TAG
+import com.aperturescience.terminal.EasterEgg
 import com.aperturescience.terminal.Intent
 import com.aperturescience.terminal.NAMED_KEYS
 import com.aperturescience.terminal.TerminalEngine
@@ -30,6 +31,13 @@ fun main() {
         engine.state.collectLatest { state ->
             val blinkRange = state.annotations.firstOrNull { it.tag == BLINK_TAG }?.range
             renderScreen(screen, state.displayText, blinkRange)
+
+            // TODO: hook these up to a real store link, trailer link, and video embed - logic
+            // only tells us *which* easter egg fired, it stays oblivious to real-world URLs/media
+            // (see TextAnnotation.kt). For now these are unused - no-op hook points.
+            state.annotations.firstOrNull { it.tag == EasterEgg.STORE.tag }
+            state.annotations.firstOrNull { it.tag == EasterEgg.TRAILER.tag }
+            state.annotations.firstOrNull { it.tag == EasterEgg.SECURITY_VIDEO.tag }
         }
     }
 

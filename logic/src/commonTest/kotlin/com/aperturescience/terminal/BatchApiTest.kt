@@ -134,6 +134,10 @@ class BatchApiTest {
                 engine.state.value.displayText
                     .contains("ERROR: STORE NOT FOUND"),
             )
+            assertTrue(
+                engine.state.value.annotations
+                    .any { it.tag == EasterEgg.STORE.tag },
+            )
         }
 
     @Test

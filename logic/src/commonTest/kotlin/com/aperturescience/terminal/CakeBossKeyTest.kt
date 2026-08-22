@@ -15,6 +15,10 @@ class CakeBossKeyTest {
             val output = engine.state.value.displayText
             assertTrue(output.contains("When was the last time you left the building?"))
             assertTrue(output.contains("If a supervisor walks by, press return!"))
+            assertTrue(
+                engine.state.value.annotations
+                    .any { it.tag == EasterEgg.SECURITY_VIDEO.tag },
+            )
         }
 
     @Test

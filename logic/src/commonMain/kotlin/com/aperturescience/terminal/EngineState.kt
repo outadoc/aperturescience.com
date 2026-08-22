@@ -19,8 +19,17 @@ data class EngineState(
      */
     val exitRequested: Boolean = false,
     /**
-     * Reducer-only bookkeeping: the not-yet-closed blink annotation's start offset mid-reveal.
-     * Always `null` between turns.
+     * Reducer-only bookkeeping: the not-yet-closed annotation's start offset mid-reveal. Always
+     * `null` between turns. Paired with [pendingAnnotationTag] - only one annotation is ever
+     * open at a time, so a single field is enough, not a stack.
      */
     val pendingAnnotationStart: Int? = null,
+    /**
+     * Reducer-only bookkeeping: which tag the not-yet-closed annotation will get once its end
+     * marker is reached (see `START_CHAR_TO_TAG`). Always `null` between turns - not mirrored in
+     * `ui-minitel`'s serializable state for the same reason [pendingAnnotationStart] isn't:
+     * minitel always runs with `instantReveal = true`, so state is only ever read after a reveal
+     * has fully completed.
+     */
+    val pendingAnnotationTag: String? = null,
 )

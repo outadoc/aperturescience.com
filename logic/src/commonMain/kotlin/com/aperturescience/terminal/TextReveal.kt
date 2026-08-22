@@ -5,7 +5,49 @@ package com.aperturescience.terminal
  * should carry a [TextAnnotation], stripped from [EngineState.pageContent] itself.
  */
 internal const val BLINK_START = '' // STX
+
+/**
+ * Shared close marker for every tag in [START_CHAR_TO_TAG], not just [BLINK_TAG] - only one
+ * annotation is ever open at a time (see [EngineState.pendingAnnotationTag]), so the reducer
+ * always knows which tag it's closing without needing a distinct end char per tag.
+ */
 internal const val BLINK_END = '' // ETX
+
+/**
+ * Reserved start-marker char for each [EasterEgg] - internal (not private) so tests can
+ * drive [TerminalReducer.reduceCharacterRevealed] directly with a known easter-egg char.
+ */
+internal val EASTER_EGG_START_CHAR: Map<EasterEgg, Char> =
+    mapOf(
+        EasterEgg.STORE to '', // EOT
+        EasterEgg.TRAILER to '', // ENQ
+        EasterEgg.SECURITY_VIDEO to '', // ACK
+    )
+
+/**
+ * Every reserved start-marker char, mapped to the [TextAnnotation.tag] string it opens -
+ * covers [buildRevealChars]' own `@`/[BLINK_TAG] substitution plus every [EasterEgg].
+ */
+internal val START_CHAR_TO_TAG: Map<Char, String> =
+    buildMap {
+        put(BLINK_START, BLINK_TAG)
+        EASTER_EGG_START_CHAR.forEach { (easterEgg, char) -> put(char, easterEgg.tag) }
+    }
+
+/**
+ * Every char [visibleLength]/[splitAtVisibleWidth] must treat as zero-width - none of these
+ * are ever appended to [EngineState.pageContent].
+ */
+internal val MARKER_CHARS: Set<Char> = START_CHAR_TO_TAG.keys + BLINK_END
+
+/**
+ * Wraps [text] in [easterEgg]'s start marker and the shared end marker, so the reveal stream
+ * picks it up as a `TextAnnotation` once revealed - see `TerminalReducer.reduceCharacterRevealed`.
+ */
+internal fun taggedSpan(
+    easterEgg: EasterEgg,
+    text: String,
+): String = "${EASTER_EGG_START_CHAR.getValue(easterEgg)}$text$BLINK_END"
 
 /**
  * Turns [text] into the flat character stream a reveal effect replays one at a time: substitutes
@@ -58,18 +100,18 @@ internal fun wordWrap(
 }
 
 /**
- * [BLINK_START]/[BLINK_END] carry no visible width - wrap decisions go by what actually
- * occupies a column, not raw [CharSequence.length].
+ * [MARKER_CHARS] carry no visible width - wrap decisions go by what actually occupies a column,
+ * not raw [CharSequence.length].
  */
 internal fun visibleLength(s: CharSequence): Int {
     var count = 0
-    for (c in s) if (c != BLINK_START && c != BLINK_END) count++
+    for (c in s) if (c !in MARKER_CHARS) count++
     return count
 }
 
 /**
  * [wordWrap]'s hard-cut path: splits [s] at exactly [width] visible characters, keeping any
- * [BLINK_START]/[BLINK_END] markers attached to the head rather than left dangling alone.
+ * [MARKER_CHARS] attached to the head rather than left dangling alone.
  */
 internal fun splitAtVisibleWidth(
     s: String,
@@ -78,9 +120,9 @@ internal fun splitAtVisibleWidth(
     var visible = 0
     var i = 0
     while (i < s.length && visible < width) {
-        if (s[i] != BLINK_START && s[i] != BLINK_END) visible++
+        if (s[i] !in MARKER_CHARS) visible++
         i++
     }
-    while (i < s.length && (s[i] == BLINK_START || s[i] == BLINK_END)) i++
+    while (i < s.length && s[i] in MARKER_CHARS) i++
     return s.substring(0, i) to s.substring(i)
 }

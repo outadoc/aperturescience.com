@@ -273,9 +273,16 @@ class ShellCommandsTest {
                 val engine = loginToShell()
                 submit(engine, cmd)
                 assertTrue(engine.state.value.exitRequested, "expected exitRequested after '$cmd'")
-                assertTrue(
-                    engine.state.value.displayText
-                        .contains("[ERROR: STORE NOT FOUND]"),
+
+                val text = engine.state.value.displayText
+                assertTrue(text.contains("[ERROR: STORE NOT FOUND]"))
+
+                val annotation =
+                    engine.state.value.annotations
+                        .single { it.tag == EasterEgg.STORE.tag }
+                assertEquals(
+                    "[ERROR: STORE NOT FOUND]",
+                    text.substring(annotation.range.first, annotation.range.last + 1),
                 )
             }
         }
@@ -286,9 +293,16 @@ class ShellCommandsTest {
             val engine = loginToShell()
             submit(engine, "PLAY PORTAL")
             assertTrue(engine.state.value.exitRequested)
-            assertTrue(
-                engine.state.value.displayText
-                    .contains("[ERROR: TRAILER NOT FOUND]"),
+
+            val text = engine.state.value.displayText
+            assertTrue(text.contains("[ERROR: TRAILER NOT FOUND]"))
+
+            val annotation =
+                engine.state.value.annotations
+                    .single { it.tag == EasterEgg.TRAILER.tag }
+            assertEquals(
+                "[ERROR: TRAILER NOT FOUND]",
+                text.substring(annotation.range.first, annotation.range.last + 1),
             )
         }
 
