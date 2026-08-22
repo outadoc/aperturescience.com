@@ -114,97 +114,56 @@ matches the original: your only real exit there was closing the browser tab).
   the current line. Max input length is 65 characters.
 - Commands are matched **case-insensitively as typed** but compared
   **exactly** — no abbreviations, no partial matches.
-- <kbd>PageUp</kbd> / <kbd>PageDown</kbd> only do anything on a job-
-  application question with more than 104 choices (only question 21 — see
-  below).
 
 ## Command / state tree
 
 Every screen the terminal can show, and every input that moves you between
-them. Error/rejection text is quoted verbatim; unlabeled arrows mean "any
-other input is silently ignored, prompt stays as-is".
+them. Error/rejection text is quoted verbatim.
 
-```
-Boot
-└─ "> "                                              (initial prompt)
-   ├─ HELP | ?  ──────────────────────────▶  "crisis response team" joke message ──▶ back to "> "
-   ├─ LOGON | LOGIN | USER
-   │  └─ "Username> "
-   │     └─ <any text, length > 2>                    (≤ 2 chars: rejected, reprompt)
-   │        └─ "Password> "                           (input echoed as ***)
-   │           ├─ if username was "CJOHNSON":
-   │           │  ├─ "TIER3"        ──▶  SHELL (admin: "GLaDOS v1.07a", "ADMIN>" prompt)
-   │           │  └─ anything else  ──▶  "ERROR 07 [Incorrect Password]" ──▶ retry "Password> "
-   │           └─ else:
-   │              ├─ "PORTAL" | "PORTALS"  ──▶  SHELL (regular: "GLaDOS v1.07", "B:\>" prompt)
-   │              └─ anything else          ──▶  "ERROR 07 [Incorrect Password]" ──▶ retry
-   └─ anything else  ──▶  (ignored)
-
-SHELL  (GLaDOS v1.07[a] (c) 1982 Aperture Science, Inc.)
-├─ DIR | CATALOG | DIRECTORY | LIST | LS | CAT
-│    ──▶ fake directory listing: "APPLY.EXE" (+ "NOTES.EXE" if admin)
-├─ IP                    ──▶ "uid:<synthesized session id>"
-├─ HELP | LIB | ?        ──▶ command list (adds "NOTES" if admin)
-├─ APPEND | ATTRIB | COPY | FORMAT | ERASE | RENAME
-│    ──▶ "ERROR 15 [Disk is write protected]"
-├─ PLAY
-│  ├─ (no argument)      ──▶ "ERROR 03 [What would you like to play?]"
-│  ├─ PLAY PORTAL        ──▶ prints a short message, then exits the program
-│  │                          (the original opened a YouTube trailer; no browser is opened here)
-│  └─ PLAY <anything else> ──▶ (no output)
-├─ INTERROGATE
-│  ├─ (no argument)      ──▶ "ERROR 02 [Command requires at least one parameter]"
-│  ├─ (as admin)         ──▶ "ERROR 07 [Unknown Employee]"
-│  └─ (as regular user)  ──▶ "ERROR 01 [Illegal attempt to initiate disciplinary action]"
-├─ TAPEDISK              ──▶ "ERROR 18 [User not authorized to transfer system tapes]"
-├─ NOTES | NOTES.EXE
-│  ├─ (as admin, i.e. logged in as CJOHNSON)  ──▶ NOTES.EXE  (see below)
-│  └─ (as regular user)  ──▶ "ERROR 24 [File 'NOTES' not found]"
-├─ APPLY | APPLY.EXE     ──▶ APPLICATION  (see below)
-├─ THECAKEISALIE         ──▶ CAKE / BOSSKEY loop  (see below)
-├─ LOGOUT | BYE | LOGOFF | VALVE  ──▶ prints a short message, then exits the program
-└─ anything else         ──▶ "ERROR 24 [File '<word>' not found]"
-
-APPLICATION  (job-application wizard, entered via APPLY)
-└─ intro screen: "Loaded: ENRICHMENT CENTER TEST SUBJECT APPLICATION PROCESS..."
-   ├─ QUIT       ──▶ back to SHELL
-   └─ CONTINUE
-      └─ UID display screen: "...your form ... Unique Indentity Number ... [<uid>]..."
-         ├─ QUIT       ──▶ back to SHELL
-         └─ CONTINUE
-            └─ Question 1 ──▶ Question 2 ──▶ ... ──▶ Question 50   (50 total, see below)
-               └─ after Question 50 is reached, the next Enter ends the form immediately
-                  (its answer is never actually validated or submitted — this is a quirk
-                  in the original, faithfully reproduced) and shows:
-                  "Congratulations! ... Please enter your 64 digit UIN(+L) to complete
-                  the process."
-                  ├─ "THECAKEISALIE"    ──▶ CAKE / BOSSKEY loop
-                  └─ anything else      ──▶ dead end: "The entered UIN(+L) does not
-                                              match..." — no further input does anything;
-                                              only Ctrl+C escapes this screen
-
-  Each question (types come from the original form):
-  ├─ type TEXT (free text)      ──▶ any input accepted, advances to the next question
-  ├─ type CHECKBOX / RADIO      ──▶ a number from 1 to <choice count> advances;
-  │                                  anything else is silently rejected (question redisplays)
-  ├─ QUIT  (works on any question)  ──▶ back to SHELL, form abandoned
-  └─ PageUp / PageDown  ──▶ only active on Question 21 ("...what wild animal would you
-                             like to domesticate?", 2313 choices) — pages through 104
-                             choices at a time
-
-NOTES.EXE  (admin-only, entered via NOTES from the shell)
-└─ page 1 of 4 (Aperture Science corporate history, 1953–1996)
-   └─ any keypress ──▶ page 2 ──▶ page 3 ──▶ page 4 ("...In many ways, the
-      initial test goes well... [END]")
-      └─ any keypress ──▶ back to SHELL
-
-CAKE / BOSSKEY  (entered via THECAKEISALIE from the shell, or as the UIN(+L) answer)
-└─ cake monologue + security-feed placeholder ("...When was the last time
-   you left the building?..." / "...If a supervisor walks by, press return!")
-   └─ any keypress ──▶ BOSSKEY: a disguised fake spreadsheet screen
-      └─ any keypress ──▶ back to the cake monologue
-         └─ ... (toggles forever — there is no scripted way out of this loop;
-                 press Ctrl+C to exit)
+```mermaid
+flowchart TD
+    Boot(["Boot"]) --> Prompt["&quot;&gt; &quot;<br/>(initial prompt)"]
+    Prompt -- " HELP / ? " --> HelpJoke["'crisis response team'<br/>joke message"] --> Prompt
+    Prompt -- " LOGON / LOGIN / USER " --> Username["&quot;Username&gt; &quot;"]
+    Prompt -- " anything else " --> Prompt
+    Username -- " text ≤ 2 chars: rejected " --> Username
+    Username -- " text &gt; 2 chars " --> Password["&quot;Password&gt; &quot;<br/>(echoed as ***)"]
+    Password -- " user = CJOHNSON<br/>pass = &quot;TIER3&quot; " --> ShellAdmin["SHELL (admin)<br/>GLaDOS v1.07a — &quot;ADMIN&gt;&quot;"]
+    Password -- " user = CJOHNSON<br/>pass ≠ &quot;TIER3&quot; " --> ErrPw1["ERROR 07<br/>Incorrect Password"] --> Password
+    Password -- " user ≠ CJOHNSON<br/>pass = &quot;PORTAL&quot; / &quot;PORTALS&quot; " --> ShellUser["SHELL (regular)<br/>GLaDOS v1.07 — &quot;B:\&gt;&quot;"]
+    Password -- " user ≠ CJOHNSON<br/>pass ≠ &quot;PORTAL&quot; / &quot;PORTALS&quot; " --> ErrPw2["ERROR 07<br/>Incorrect Password"] --> Password
+    ShellAdmin --> Shell{{"SHELL"}}
+    ShellUser --> Shell
+    Shell -- " DIR / CATALOG / DIRECTORY / LIST / LS / CAT " --> Dir["directory listing:<br/>APPLY.EXE (+ NOTES.EXE if admin)"] --> Shell
+    Shell -- " IP " --> Ip["&quot;uid:&lt;session id&gt;&quot;"] --> Shell
+    Shell -- " HELP / LIB / ? " --> HelpList["command list<br/>(+ NOTES if admin)"] --> Shell
+    Shell -- " APPEND / ATTRIB / COPY / FORMAT / ERASE / RENAME " --> ErrWrite["ERROR 15<br/>Disk is write protected"] --> Shell
+    Shell -- " PLAY (no argument) " --> ErrPlay["ERROR 03<br/>What would you like to play?"] --> Shell
+    Shell -- " PLAY PORTAL " --> ExitPlay(["prints message,<br/>exits program"])
+    Shell -- " PLAY &lt;anything else&gt; " --> Shell
+    Shell -- " INTERROGATE (no argument) " --> ErrInt1["ERROR 02<br/>Command requires at least one parameter"] --> Shell
+    Shell -- " INTERROGATE (as admin) " --> ErrInt2["ERROR 07<br/>Unknown Employee"] --> Shell
+    Shell -- " INTERROGATE (as regular user) " --> ErrInt3["ERROR 01<br/>Illegal attempt to initiate disciplinary action"] --> Shell
+    Shell -- " TAPEDISK " --> ErrTape["ERROR 18<br/>User not authorized to transfer system tapes"] --> Shell
+    Shell -- " NOTES / NOTES.EXE (as admin) " --> Notes1
+    Shell -- " NOTES (as regular user) " --> ErrNotes["ERROR 24<br/>File 'NOTES' not found"] --> Shell
+    Shell -- " APPLY / APPLY.EXE " --> AppIntro
+    Shell -- " THECAKEISALIE " --> Cake1
+    Shell -- " LOGOUT / BYE / LOGOFF / VALVE " --> ExitLogout(["prints message,<br/>exits program"])
+    Shell -- " anything else " --> ErrNotFound["ERROR 24<br/>File '&lt;word&gt;' not found"] --> Shell
+    AppIntro["APPLICATION intro:<br/>'Loaded: ENRICHMENT CENTER<br/>TEST SUBJECT APPLICATION PROCESS...'"] -- " QUIT " --> Shell
+    AppIntro -- " CONTINUE " --> Uid["UID display screen"]
+    Uid -- " QUIT " --> Shell
+    Uid -- " CONTINUE " --> Q1["Question 1"]
+    Q1 -- " ... 50 questions total ...<br/>QUIT on any question → SHELL, form abandoned " --> Q50["Question 50"]
+    Q50 -- " next Enter ends the form<br/>(answer never validated/submitted — quirk) " --> Congrats["'Congratulations! ...<br/>enter your 64 digit UIN(+L)'"]
+    Congrats -- " THECAKEISALIE " --> Cake1
+    Congrats -- " anything else " --> DeadEnd["dead end:<br/>'UIN(+L) does not match'<br/>(only Ctrl+C escapes)"]
+    Q1 -.- QRules["each question:<br/>TEXT → any input advances<br/>CHECKBOX/RADIO → number 1..N advances, else rejected"]
+    Notes1["NOTES.EXE page 1/4<br/>(history 1953–1996)"] -- " any keypress " --> Notes2["page 2"] -- " any keypress " --> Notes3["page 3"] -- " any keypress " --> Notes4["page 4<br/>'...In many ways...' [END]"]
+    Notes4 -- " any keypress " --> Shell
+    Cake1["CAKE monologue +<br/>security-feed placeholder"] -- " any keypress " --> Boss["BOSSKEY:<br/>disguised fake spreadsheet"]
+    Boss -- " any keypress (loops forever) " --> Cake1
 ```
 
 **Global, from any state:** <kbd>Ctrl+C</kbd> exits the program immediately.
