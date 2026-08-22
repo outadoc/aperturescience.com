@@ -256,7 +256,7 @@ class ApplicationWizardTest {
             answerQuestions(engine, TerminalData.questions.take(20))
 
             val firstPage = engine.state.value.displayText
-            pressKey(engine, "PageUp")
+            pressKey(engine, Key.Named.PAGE_UP)
             assertEquals(firstPage, engine.state.value.displayText)
         }
 
@@ -268,9 +268,9 @@ class ApplicationWizardTest {
             check(TerminalData.questions[1].choices.size <= 104)
 
             val before = engine.state.value.displayText
-            pressKey(engine, "PageDown")
+            pressKey(engine, Key.Named.PAGE_DOWN)
             assertEquals(before, engine.state.value.displayText)
-            pressKey(engine, "PageUp")
+            pressKey(engine, Key.Named.PAGE_UP)
             assertEquals(before, engine.state.value.displayText)
         }
 
@@ -279,7 +279,7 @@ class ApplicationWizardTest {
         runTest {
             val engine = loginToShell()
             val before = engine.state.value.displayText
-            pressKey(engine, "PageDown")
+            pressKey(engine, Key.Named.PAGE_DOWN)
             assertEquals(before, engine.state.value.displayText)
         }
 

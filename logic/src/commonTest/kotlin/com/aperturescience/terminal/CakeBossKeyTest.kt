@@ -28,7 +28,7 @@ class CakeBossKeyTest {
             submit(engine, "THECAKEISALIE")
             val cakeScreen = engine.state.value.displayText
 
-            pressKey(engine, "X")
+            pressKey(engine, Key.RawChar('X'))
             val bosskeyScreen = engine.state.value.displayText
             assertNotEquals(cakeScreen, bosskeyScreen)
             assertTrue(bosskeyScreen.contains("TOTAL"))
@@ -42,8 +42,8 @@ class CakeBossKeyTest {
             submit(engine, "THECAKEISALIE")
             val cakeScreen = engine.state.value.displayText
 
-            pressKey(engine, "X")
-            pressKey(engine, "Y")
+            pressKey(engine, Key.RawChar('X'))
+            pressKey(engine, Key.RawChar('Y'))
             assertEquals(cakeScreen, engine.state.value.displayText)
         }
 
@@ -54,7 +54,7 @@ class CakeBossKeyTest {
             submit(engine, "THECAKEISALIE")
             val cakeScreen = engine.state.value.displayText
 
-            repeat(10) { pressKey(engine, "Q") }
+            repeat(10) { pressKey(engine, Key.RawChar('Q')) }
             // an even number of toggles lands back on the cake screen
             assertEquals(cakeScreen, engine.state.value.displayText)
         }
@@ -62,7 +62,7 @@ class CakeBossKeyTest {
     @Test
     fun `PageUp PageDown and ArrowLeft also toggle the cake-bosskey loop`() =
         runTest {
-            for (key in listOf("PageUp", "PageDown", "ArrowLeft")) {
+            for (key in listOf(Key.Named.PAGE_UP, Key.Named.PAGE_DOWN, Key.Named.ARROW_LEFT)) {
                 val engine = loginToShell()
                 submit(engine, "THECAKEISALIE")
                 val cakeScreen = engine.state.value.displayText
@@ -79,7 +79,7 @@ class CakeBossKeyTest {
             submit(engine, "THECAKEISALIE")
             val before = engine.state.value.displayText
 
-            pressKey(engine, "Escape")
+            pressKey(engine, Key.Other)
             assertEquals(before, engine.state.value.displayText)
         }
 
@@ -88,8 +88,8 @@ class CakeBossKeyTest {
         runTest {
             val engine = loginToShell()
             submit(engine, "THECAKEISALIE")
-            pressKey(engine, "X")
-            pressKey(engine, "Y")
+            pressKey(engine, Key.RawChar('X'))
+            pressKey(engine, Key.RawChar('Y'))
             assertTrue(!engine.state.value.exitRequested)
         }
 }

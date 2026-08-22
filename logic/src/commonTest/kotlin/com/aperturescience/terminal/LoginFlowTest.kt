@@ -195,7 +195,7 @@ class LoginFlowTest {
             submit(engine, "LOGON")
             submit(engine, "TESTER")
 
-            launch { engine.dispatch(Intent.KeyPressed("P")) }
+            launch { engine.dispatch(Intent.KeyPressed(Key.RawChar('P'))) }
             advanceUntilIdle()
             assertTrue(
                 engine.state.value.displayText
@@ -206,8 +206,8 @@ class LoginFlowTest {
                     .endsWith("P"),
             )
 
-            launch { engine.dispatch(Intent.KeyPressed("O")) }
-            launch { engine.dispatch(Intent.KeyPressed("R")) }
+            launch { engine.dispatch(Intent.KeyPressed(Key.RawChar('O'))) }
+            launch { engine.dispatch(Intent.KeyPressed(Key.RawChar('R'))) }
             advanceUntilIdle()
             assertTrue(
                 engine.state.value.displayText

@@ -13,10 +13,10 @@ sealed interface Intent {
     data object Boot : Intent
 
     /**
-     * A single raw key, as reported by the host platform (e.g. `KeyboardEvent.key`).
+     * A single raw key, as reported by the host platform.
      */
     data class KeyPressed(
-        val key: String,
+        val key: Key,
     ) : Intent
 
     /**

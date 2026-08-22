@@ -6,36 +6,41 @@ package com.aperturescience.terminal
 internal const val MAX_INPUT_LENGTH = 65
 
 /**
- * Keys the reducer treats specially, rather than as a single printable character (see
- * [isAcceptedChar]). Maps each platform's raw key-name string to one shared set.
+ * A single raw key, as reported by a host platform.
  */
-internal enum class NamedKey(
-    val keyName: String,
-) {
-    ENTER("Enter"),
-    BACKSPACE("Backspace"),
-    PAGE_UP("PageUp"),
-    PAGE_DOWN("PageDown"),
-    ARROW_LEFT("ArrowLeft"),
-    ;
+sealed interface Key {
+    /**
+     * A printable character typed as-is.
+     */
+    data class RawChar(
+        val char: Char,
+    ) : Key
 
-    companion object {
-        private val byName = entries.associateBy { it.keyName }
+    /**
+     * Any key the platform positively identifies but the reducer never treats specially -
+     * always rejected by [isAcceptedKey].
+     */
+    data object Other : Key
 
-        fun from(key: String): NamedKey? = byName[key]
+    /**
+     * Keys the reducer treats specially, rather than as a single printable character (see
+     * [isAcceptedChar]). Each platform adapter maps its own raw key events to this shared set.
+     */
+    enum class Named : Key {
+        ENTER,
+        BACKSPACE,
+        PAGE_UP,
+        PAGE_DOWN,
+        ARROW_LEFT,
     }
 }
-
-/**
- * Public re-export of [NamedKey]'s recognized key-name strings, for hosts that need to
- * pre-filter which keys are worth dispatching at all (e.g. `ui-web`).
- */
-val NAMED_KEYS: Set<String> = NamedKey.entries.map { it.keyName }.toSet()
 
 internal fun isAcceptedChar(c: Char): Boolean =
     c.isDigit() || c.uppercaseChar() in 'A'..'Z' || c == ' ' || c == '?' || c == '.'
 
-internal fun isAcceptedRawKey(
-    namedKey: NamedKey?,
-    key: String,
-): Boolean = namedKey != null || key == " " || (key.length == 1 && isAcceptedChar(key[0]))
+internal fun isAcceptedKey(key: Key): Boolean =
+    when (key) {
+        is Key.Named -> true
+        is Key.RawChar -> isAcceptedChar(key.char)
+        Key.Other -> false
+    }

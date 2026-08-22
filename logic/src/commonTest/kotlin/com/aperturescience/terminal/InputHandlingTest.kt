@@ -14,9 +14,9 @@ class InputHandlingTest {
             launch { engine.dispatch(Intent.Boot) }
             // Deliberately not advancing virtual time: the boot-time typewriter reveal is still
             // "in flight", so the engine is locked and every key must be a no-op.
-            launch { engine.dispatch(Intent.KeyPressed("L")) }
-            launch { engine.dispatch(Intent.KeyPressed("O")) }
-            launch { engine.dispatch(Intent.KeyPressed("Enter")) }
+            launch { engine.dispatch(Intent.KeyPressed(Key.RawChar('L'))) }
+            launch { engine.dispatch(Intent.KeyPressed(Key.RawChar('O'))) }
+            launch { engine.dispatch(Intent.KeyPressed(Key.Named.ENTER)) }
             assertEquals("", engine.state.value.displayText)
 
             advanceUntilIdle()
@@ -27,8 +27,8 @@ class InputHandlingTest {
     fun `digits letters space and question mark are all accepted`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
-            for (key in listOf("A", "z", "5", " ", "?")) {
-                launch { engine.dispatch(Intent.KeyPressed(key)) }
+            for (c in listOf('A', 'z', '5', ' ', '?')) {
+                launch { engine.dispatch(Intent.KeyPressed(Key.RawChar(c))) }
             }
             advanceUntilIdle()
             assertEquals("> AZ5 ?", engine.state.value.displayText)
@@ -38,7 +38,7 @@ class InputHandlingTest {
     fun `lowercase letters are uppercased as they are typed`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
-            for (c in "logon") launch { engine.dispatch(Intent.KeyPressed(c.toString())) }
+            for (c in "logon") launch { engine.dispatch(Intent.KeyPressed(Key.RawChar(c))) }
             advanceUntilIdle()
             assertEquals("> LOGON", engine.state.value.displayText)
         }
@@ -47,8 +47,8 @@ class InputHandlingTest {
     fun `punctuation other than question mark is rejected outright`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
-            for (key in listOf(",", "!", "@", "#", "-", "_", "/", "'", "\"")) {
-                launch { engine.dispatch(Intent.KeyPressed(key)) }
+            for (c in listOf(',', '!', '@', '#', '-', '_', '/', '\'', '"')) {
+                launch { engine.dispatch(Intent.KeyPressed(Key.RawChar(c))) }
             }
             advanceUntilIdle()
             assertEquals(
@@ -62,18 +62,16 @@ class InputHandlingTest {
     fun `a period is accepted so file names like NOTES-EXE can be typed`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
-            for (c in "NOTES.EXE") launch { engine.dispatch(Intent.KeyPressed(c.toString())) }
+            for (c in "NOTES.EXE") launch { engine.dispatch(Intent.KeyPressed(Key.RawChar(c))) }
             advanceUntilIdle()
             assertEquals("> NOTES.EXE", engine.state.value.displayText)
         }
 
     @Test
-    fun `special key names other than Enter Backspace PageUp PageDown are ignored as text`() =
+    fun `keys with no special meaning are ignored as text`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
-            for (key in listOf("F1", "Insert", "Delete", "Home", "End", "ArrowUp", "Tab", "Escape")) {
-                launch { engine.dispatch(Intent.KeyPressed(key)) }
-            }
+            launch { engine.dispatch(Intent.KeyPressed(Key.Other)) }
             advanceUntilIdle()
             assertEquals("> ", engine.state.value.displayText)
         }
@@ -82,11 +80,11 @@ class InputHandlingTest {
     fun `Backspace removes the last typed character`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
-            for (c in "AB") launch { engine.dispatch(Intent.KeyPressed(c.toString())) }
+            for (c in "AB") launch { engine.dispatch(Intent.KeyPressed(Key.RawChar(c))) }
             advanceUntilIdle()
             assertEquals("> AB", engine.state.value.displayText)
 
-            pressKey(engine, "Backspace")
+            pressKey(engine, Key.Named.BACKSPACE)
             assertEquals("> A", engine.state.value.displayText)
         }
 
@@ -94,7 +92,7 @@ class InputHandlingTest {
     fun `Backspace on empty input does nothing`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
-            pressKey(engine, "Backspace")
+            pressKey(engine, Key.Named.BACKSPACE)
             assertEquals("> ", engine.state.value.displayText)
         }
 
@@ -102,7 +100,7 @@ class InputHandlingTest {
     fun `input is capped at sixty-five characters`() =
         runTest {
             val engine = bootAndSettle(TerminalEngine())
-            repeat(70) { launch { engine.dispatch(Intent.KeyPressed("A")) } }
+            repeat(70) { launch { engine.dispatch(Intent.KeyPressed(Key.RawChar('A'))) } }
             advanceUntilIdle()
             assertEquals("> " + "A".repeat(65), engine.state.value.displayText)
         }

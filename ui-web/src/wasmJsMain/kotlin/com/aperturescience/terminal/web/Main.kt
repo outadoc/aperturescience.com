@@ -3,7 +3,7 @@ package com.aperturescience.terminal.web
 import com.aperturescience.terminal.BLINK_TAG
 import com.aperturescience.terminal.EasterEgg
 import com.aperturescience.terminal.Intent
-import com.aperturescience.terminal.NAMED_KEYS
+import com.aperturescience.terminal.Key
 import com.aperturescience.terminal.TerminalEngine
 import com.aperturescience.terminal.displayText
 import kotlinx.browser.document
@@ -79,19 +79,14 @@ fun main() {
     // addEventListener's EventListener and (Event) -> Unit overloads.
     val onKeyDown: (Event) -> Unit = { event ->
         if (acceptingInput) {
-            val keyboardEvent = event as KeyboardEvent
-            handleKeyDown(
-                event = keyboardEvent,
-                engine = engine,
-                scope = scope,
-            )
+            val dispatchedKey =
+                handleKeyDown(
+                    event = event as KeyboardEvent,
+                    engine = engine,
+                    scope = scope,
+                )
             // Mirrors the reducer's own input-buffer reset on submit.
-            val isPlainEnter =
-                keyboardEvent.key == "Enter" &&
-                    !keyboardEvent.ctrlKey &&
-                    !keyboardEvent.metaKey &&
-                    !keyboardEvent.altKey
-            if (isPlainEnter) {
+            if (dispatchedKey == Key.Named.ENTER) {
                 mobileInput.value = ""
                 previousMobileInputValue = ""
             }
@@ -293,21 +288,24 @@ private const val UNWRAPPED_WIDTH = Int.MAX_VALUE
 
 /**
  * Forwards named keys to [Intent.KeyPressed]; printable chars/Backspace go through [handleInput].
+ * Returns the [Key.Named] dispatched, if any.
  */
 private fun handleKeyDown(
     event: KeyboardEvent,
     engine: TerminalEngine,
     scope: CoroutineScope,
-) {
+): Key.Named? {
     if (event.ctrlKey || event.metaKey || event.altKey) {
-        return
+        return null
     }
 
-    val key = event.key
-    if (key in NAMED_KEYS && key != "Backspace") {
+    val namedKey = event.toNamedKeyOrNull()
+    if (namedKey != null && namedKey != Key.Named.BACKSPACE) {
         event.preventDefault()
-        scope.launch { engine.dispatch(Intent.KeyPressed(key)) }
+        scope.launch { engine.dispatch(Intent.KeyPressed(namedKey)) }
+        return namedKey
     }
+    return null
 }
 
 /**
@@ -326,10 +324,10 @@ private fun handleInput(
 
     scope.launch {
         repeat(backspaces) {
-            engine.dispatch(Intent.KeyPressed("Backspace"))
+            engine.dispatch(Intent.KeyPressed(Key.Named.BACKSPACE))
         }
         for (c in inserted) {
-            engine.dispatch(Intent.KeyPressed(c.toString()))
+            engine.dispatch(Intent.KeyPressed(Key.RawChar(c)))
         }
     }
 

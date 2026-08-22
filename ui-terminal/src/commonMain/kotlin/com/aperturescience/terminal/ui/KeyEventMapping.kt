@@ -1,31 +1,34 @@
 package com.aperturescience.terminal.ui
 
+import com.aperturescience.terminal.Key
 import com.jakewharton.mosaic.terminal.KeyboardEvent
 
 /**
- * Maps a raw [KeyboardEvent] to the key-name string `Intent.KeyPressed` expects, porting the
- * codepoint table Mosaic's own (Compose-only) `compat.kt` uses internally. Returns null for
- * key-release/repeat events and unrecognized codepoints instead of throwing.
+ * Maps a raw [KeyboardEvent] to the [Key] `Intent.KeyPressed` expects, porting the codepoint
+ * table Mosaic's own (Compose-only) `compat.kt` uses internally. Recognized keys with no special
+ * meaning to the reducer (Tab, Escape, arrows other than left, Insert/Delete/Home/End, F-keys)
+ * map to [Key.Other]. Returns null for key-release/repeat events and unrecognized codepoints
+ * instead of throwing.
  */
-internal fun KeyboardEvent.toKeyNameOrNull(): String? {
+internal fun KeyboardEvent.toKeyOrNull(): Key? {
     if (eventType != KeyboardEvent.EventTypePress) return null
     return when (val cp = codepoint) {
-        9 -> "Tab"
-        13 -> "Enter"
-        27 -> "Escape"
-        in 32..126 -> cp.toChar().toString()
-        127 -> "Backspace"
-        KeyboardEvent.Left -> "ArrowLeft"
-        KeyboardEvent.Right -> "ArrowRight"
-        KeyboardEvent.Up -> "ArrowUp"
-        KeyboardEvent.Down -> "ArrowDown"
-        KeyboardEvent.Insert -> "Insert"
-        KeyboardEvent.Delete -> "Delete"
-        KeyboardEvent.PageUp -> "PageUp"
-        KeyboardEvent.PageDown -> "PageDown"
-        KeyboardEvent.Home -> "Home"
-        KeyboardEvent.End -> "End"
-        in 57364..57398 -> "F" + (cp - 57363)
+        9 -> Key.Other
+        13 -> Key.Named.ENTER
+        27 -> Key.Other
+        in 32..126 -> Key.RawChar(cp.toChar())
+        127 -> Key.Named.BACKSPACE
+        KeyboardEvent.Left -> Key.Named.ARROW_LEFT
+        KeyboardEvent.Right -> Key.Other
+        KeyboardEvent.Up -> Key.Other
+        KeyboardEvent.Down -> Key.Other
+        KeyboardEvent.Insert -> Key.Other
+        KeyboardEvent.Delete -> Key.Other
+        KeyboardEvent.PageUp -> Key.Named.PAGE_UP
+        KeyboardEvent.PageDown -> Key.Named.PAGE_DOWN
+        KeyboardEvent.Home -> Key.Other
+        KeyboardEvent.End -> Key.Other
+        in 57364..57398 -> Key.Other
         else -> null
     }
 }

@@ -240,7 +240,7 @@ class ShellCommandsTest {
         runTest {
             val engine = loginToShell()
             val before = engine.state.value.displayText
-            pressKey(engine, "Enter")
+            pressKey(engine, Key.Named.ENTER)
             assertEquals(before, engine.state.value.displayText)
         }
 

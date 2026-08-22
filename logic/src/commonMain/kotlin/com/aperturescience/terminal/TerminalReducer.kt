@@ -133,17 +133,15 @@ object TerminalReducer {
 
     private fun reduceKeyPressed(
         state: EngineState,
-        key: String,
+        key: Key,
     ): Reduction {
         if (state.isLocked) {
             return Reduction(state)
         }
 
-        val namedKey = NamedKey.from(key)
-
         // Cake/bosskey: any accepted key toggles between the two screens, no line input at all.
         if (state.mode == Mode.Cake || state.mode == Mode.BossKey) {
-            return if (isAcceptedRawKey(namedKey, key)) {
+            return if (isAcceptedKey(key)) {
                 reduceAdvanced(state)
             } else {
                 Reduction(state)
@@ -152,19 +150,19 @@ object TerminalReducer {
 
         // NOTES.EXE forces every keystroke to behave like Enter.
         if (state.mode is Mode.Notes) {
-            return if (isAcceptedRawKey(namedKey, key)) {
+            return if (isAcceptedKey(key)) {
                 commitEnter(state)
             } else {
                 Reduction(state)
             }
         }
 
-        return when {
-            namedKey == NamedKey.ENTER -> {
+        return when (key) {
+            Key.Named.ENTER -> {
                 commitEnter(state)
             }
 
-            namedKey == NamedKey.BACKSPACE -> {
+            Key.Named.BACKSPACE -> {
                 if (state.input.isNotEmpty()) {
                     Reduction(
                         state.copy(
@@ -176,8 +174,8 @@ object TerminalReducer {
                 }
             }
 
-            key.length == 1 -> {
-                val c = key[0]
+            is Key.RawChar -> {
+                val c = key.char
                 if (isAcceptedChar(c) && state.input.length < MAX_INPUT_LENGTH) {
                     Reduction(
                         state.copy(

@@ -37,13 +37,13 @@ class NotesExeTest {
                 engine.state.value.displayText
                     .contains("1953"),
             )
-            pressKey(engine, "Enter")
+            pressKey(engine, Key.Named.ENTER)
             assertTrue(
                 engine.state.value.displayText
                     .contains("1979"),
             )
-            pressKey(engine, "Enter")
-            pressKey(engine, "Enter")
+            pressKey(engine, Key.Named.ENTER)
+            pressKey(engine, Key.Named.ENTER)
             assertTrue(
                 engine.state.value.displayText
                     .contains("[END]"),
@@ -57,14 +57,14 @@ class NotesExeTest {
             submit(engine, "NOTES")
             val firstPage = engine.state.value.displayText
 
-            pressKey(engine, "A")
+            pressKey(engine, Key.RawChar('A'))
             assertTrue(engine.state.value.displayText != firstPage)
         }
 
     @Test
     fun `PageUp PageDown and ArrowLeft also advance a page`() =
         runTest {
-            for (key in listOf("PageUp", "PageDown", "ArrowLeft")) {
+            for (key in listOf(Key.Named.PAGE_UP, Key.Named.PAGE_DOWN, Key.Named.ARROW_LEFT)) {
                 val engine = loginAsAdmin()
                 submit(engine, "NOTES")
                 val firstPage = engine.state.value.displayText
@@ -81,7 +81,7 @@ class NotesExeTest {
             submit(engine, "NOTES")
             val before = engine.state.value.displayText
 
-            pressKey(engine, "Escape")
+            pressKey(engine, Key.Other)
             assertEquals(before, engine.state.value.displayText)
         }
 
@@ -91,7 +91,7 @@ class NotesExeTest {
             val engine = loginAsAdmin()
             submit(engine, "NOTES")
 
-            repeat(4) { pressKey(engine, "Enter") }
+            repeat(4) { pressKey(engine, Key.Named.ENTER) }
 
             assertTrue(
                 engine.state.value.displayText

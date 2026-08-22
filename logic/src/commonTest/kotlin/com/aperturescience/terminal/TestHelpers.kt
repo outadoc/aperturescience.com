@@ -13,7 +13,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
  */
 fun TestScope.pressKey(
     engine: TerminalEngine,
-    key: String,
+    key: Key,
 ) {
     launch { engine.dispatch(Intent.KeyPressed(key)) }
     advanceUntilIdle()
@@ -29,9 +29,9 @@ fun TestScope.submit(
 ) {
     launch {
         for (c in text) {
-            engine.dispatch(Intent.KeyPressed(c.toString()))
+            engine.dispatch(Intent.KeyPressed(Key.RawChar(c)))
         }
-        engine.dispatch(Intent.KeyPressed("Enter"))
+        engine.dispatch(Intent.KeyPressed(Key.Named.ENTER))
     }
     advanceUntilIdle()
 }

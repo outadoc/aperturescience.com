@@ -85,13 +85,13 @@ class TerminalReducerTest {
     @Test
     fun `KeyPressed is a total no-op while locked`() {
         val locked = baseState.copy(isLocked = true)
-        assertEquals(Reduction(locked), TerminalReducer.reduce(locked, Intent.KeyPressed("A")))
+        assertEquals(Reduction(locked), TerminalReducer.reduce(locked, Intent.KeyPressed(Key.RawChar('A'))))
     }
 
     @Test
     fun `a too-short username is rejected without producing any reveal effects`() {
         val state = baseState.copy(mode = Mode.Login.Username, input = "AB")
-        val reduction = TerminalReducer.reduce(state, Intent.KeyPressed("Enter"))
+        val reduction = TerminalReducer.reduce(state, Intent.KeyPressed(Key.Named.ENTER))
 
         assertTrue(reduction.effects.isEmpty())
         assertEquals("", reduction.state.input)

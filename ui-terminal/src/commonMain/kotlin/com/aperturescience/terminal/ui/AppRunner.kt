@@ -1,6 +1,7 @@
 package com.aperturescience.terminal.ui
 
 import com.aperturescience.terminal.Intent
+import com.aperturescience.terminal.Key
 import com.aperturescience.terminal.TerminalEngine
 import com.aperturescience.terminal.WRAP_WIDTH
 import com.jakewharton.mosaic.terminal.KeyboardEvent
@@ -62,8 +63,8 @@ fun runTerminalApp() {
                     for (event in terminal.events) {
                         when (event) {
                             is KeyboardEvent -> {
-                                val key = event.toKeyNameOrNull() ?: continue
-                                if (event.ctrl && key == "c") break
+                                val key = event.toKeyOrNull() ?: continue
+                                if (event.ctrl && key == Key.RawChar('c')) break
                                 engine.dispatch(Intent.KeyPressed(key))
                             }
                             is ResizeEvent -> {
