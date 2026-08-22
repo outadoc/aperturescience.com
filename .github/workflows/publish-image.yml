@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  publish:
+  publish-minitel:
     runs-on: ubuntu-latest
 
     permissions:
@@ -27,6 +27,31 @@ jobs:
 
       - name: Push Docker image
         run: ./gradlew ui-minitel:publishImage
+        env:
+          GHCR_USERNAME: token
+          GHCR_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-telnet:
+    runs-on: ubuntu-latest
+
+    permissions:
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: "temurin"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Push Docker image
+        run: ./gradlew ui-telnet:publishImage
         env:
           GHCR_USERNAME: token
           GHCR_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
