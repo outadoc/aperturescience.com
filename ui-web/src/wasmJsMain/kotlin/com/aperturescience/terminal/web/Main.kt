@@ -14,8 +14,10 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.w3c.dom.HTMLPreElement
+import org.w3c.dom.HTMLVideoElement
 import org.w3c.dom.events.Event
 import org.w3c.dom.events.KeyboardEvent
+import kotlin.js.ExperimentalWasmJsInterop
 
 /**
  * Web counterpart to `ui-terminal`'s `App.kt`/`AppRunner.kt`: no shared UI layer (Mosaic has no
@@ -26,17 +28,20 @@ fun main() {
     val scope = CoroutineScope(Job())
 
     val screen = document.getElementById(TERMINAL_ELEMENT_ID) as HTMLPreElement
+    val trailer = document.getElementById(TRAILER_ELEMENT_ID) as HTMLVideoElement
 
     scope.launch {
         engine.state.collectLatest { state ->
             val blinkRange = state.annotations.firstOrNull { it.tag == BLINK_TAG }?.range
             renderScreen(screen, state.displayText, blinkRange)
 
-            // TODO: hook these up to a real store link, trailer link, and video embed - logic
-            // only tells us *which* easter egg fired, it stays oblivious to real-world URLs/media
-            // (see TextAnnotation.kt). For now these are unused - no-op hook points.
+            val trailerFired = state.annotations.any { it.tag == EasterEgg.TRAILER.tag }
+            showTrailer(trailer, trailerFired)
+
+            // TODO: hook these up to a real store link and video embed - logic only tells us
+            // *which* easter egg fired, it stays oblivious to real-world URLs/media (see
+            // TextAnnotation.kt). For now these are unused - no-op hook points.
             state.annotations.firstOrNull { it.tag == EasterEgg.STORE.tag }
-            state.annotations.firstOrNull { it.tag == EasterEgg.TRAILER.tag }
             state.annotations.firstOrNull { it.tag == EasterEgg.SECURITY_VIDEO.tag }
         }
     }
@@ -86,7 +91,31 @@ private fun renderScreen(
     screen.appendChild(document.createTextNode(line.substring(blinkRange.last + 1)))
 }
 
+/**
+ * Swaps [trailer] in over the terminal once the PLAY PORTAL easter egg fires - real playback,
+ * in place of `logic`'s in-universe "[ERROR: TRAILER NOT FOUND]" fallback text. Reset (paused,
+ * rewound) as soon as [show] goes false, so replaying the easter egg starts from the beginning.
+ */
+@OptIn(ExperimentalWasmJsInterop::class)
+private fun showTrailer(
+    trailer: HTMLVideoElement,
+    show: Boolean,
+) {
+    if (show == trailer.classList.contains(TRAILER_VISIBLE_CLASS)) return
+    trailer.classList.toggle(TRAILER_VISIBLE_CLASS, show)
+    if (show) {
+        // Autoplay this many reveal-effect ticks after the triggering keypress may not count as
+        // "user activation" to the browser - if it's blocked, `controls` lets the user hit play.
+        trailer.play()
+    } else {
+        trailer.pause()
+        trailer.currentTime = 0.0
+    }
+}
+
 private const val TERMINAL_ELEMENT_ID = "terminal"
+private const val TRAILER_ELEMENT_ID = "trailer"
+private const val TRAILER_VISIBLE_CLASS = "visible"
 
 /**
  * Larger than any real line - just enough to keep word-wrapping from ever triggering.

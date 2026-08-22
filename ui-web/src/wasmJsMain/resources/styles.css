@@ -67,6 +67,22 @@ body {
     opacity: var(--blink-opacity, 1);
 }
 
+/* Hidden until the PLAY PORTAL easter egg fires (see Main.kt), then covers the terminal full-
+   screen in place of logic's in-universe "[ERROR: TRAILER NOT FOUND]" fallback text. */
+#trailer {
+    display: none;
+}
+
+#trailer.visible {
+    display: block;
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    z-index: 2;
+}
+
 /* Subtle CRT scanline overlay for flavor - faint enough not to hurt legibility or fight the
    text-shadow glow above. */
 body::before {
