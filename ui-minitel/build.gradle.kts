@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.kotlin.jvm)
-    alias(libs.plugins.kotlin.plugin.serialization)
     alias(libs.plugins.ktor)
     application
 }
@@ -14,19 +13,11 @@ application {
 }
 
 dependencies {
-    implementation(project(":logic"))
-    implementation(libs.minipavi.core)
+    implementation(project(":ui-minitel-core"))
     implementation(libs.minipavi.core.ktor)
-    implementation(libs.minipavi.videotex)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)
-    implementation(libs.kotlinx.serialization.json)
     runtimeOnly(libs.logback.classic)
-    testImplementation(libs.kotlin.test)
-}
-
-tasks.withType<Test>().configureEach {
-    useJUnitPlatform()
 }
 
 base {

@@ -14,9 +14,17 @@ import fr.outadoc.minipavi.videotex.buildVideotex
 
 /**
  * Drives one MiniPavi gateway call to completion, bridging its one-line-in/one-frame-out model
- * onto `TerminalEngine`'s turn API. Not yet exercised against a live gateway.
+ * onto `TerminalEngine`'s turn API.
+ *
+ * Not suspending, so the same call works from Ktor's `minitelService` (JVM) and from
+ * `MinitelServiceHandler` on Cloudflare Workers (JS), which has no `runBlocking`. That's safe
+ * because every engine here uses `instantReveal`, so a turn never actually suspends - see
+ * [runWithoutSuspending].
  */
-suspend fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceResponse<MinitelSessionState> {
+fun handleTurn(request: GatewayRequest<MinitelSessionState>): ServiceResponse<MinitelSessionState> =
+    runWithoutSuspending { runTurn(request) }
+
+private suspend fun runTurn(request: GatewayRequest<MinitelSessionState>): ServiceResponse<MinitelSessionState> {
     val state = request.state
 
     // Farewell was already shown last turn - now disconnect without touching TerminalEngine.
@@ -231,3 +239,6 @@ private fun VideotexBuilder.appendLineWithAnnotations(
     }
     appendLine(storeSplit.after)
 }
+
+/** The service version reported to the MiniPavi gateway, shared by the Ktor and Workers hosts. */
+const val SERVICE_VERSION = "0.1.0"

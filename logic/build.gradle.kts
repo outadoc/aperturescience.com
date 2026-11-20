@@ -8,6 +8,10 @@ kotlin {
     jvmToolchain(21)
     jvm()
     linuxX64()
+    // Kotlin/JS on Node.js, for ui-minitel-worker (the Minitel service on Cloudflare Workers).
+    js {
+        nodejs()
+    }
     wasmJs {
         // d8 (V8's standalone CLI shell), not a browser - this target has no DOM dependency at
         // all, so wasmJsTest can run the whole suite headlessly instead of needing a browser.

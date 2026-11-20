@@ -4,7 +4,6 @@ import fr.outadoc.minipavi.core.model.FunctionKey
 import fr.outadoc.minipavi.core.model.GatewayRequest
 import fr.outadoc.minipavi.core.model.GatewayRequest.Event
 import fr.outadoc.minipavi.core.model.ServiceResponse
-import kotlinx.coroutines.runBlocking
 import kotlinx.io.bytestring.indexOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -33,20 +32,18 @@ class TurnHandlerTest {
         key: FunctionKey,
         userInput: List<String> = emptyList(),
     ): ServiceResponse<MinitelSessionState> =
-        runBlocking {
-            handleTurn(
-                GatewayRequest(
-                    gatewayVersion = "1.0",
-                    minitelVersion = "???",
-                    userId = "test",
-                    remoteAddress = "127.0.0.1",
-                    socketType = GatewayRequest.SocketType.WebSocket,
-                    state = state,
-                    event = Event.KeyboardInput(key),
-                    userInput = userInput,
-                ),
-            )
-        }
+        handleTurn(
+            GatewayRequest(
+                gatewayVersion = "1.0",
+                minitelVersion = "???",
+                userId = "test",
+                remoteAddress = "127.0.0.1",
+                socketType = GatewayRequest.SocketType.WebSocket,
+                state = state,
+                event = Event.KeyboardInput(key),
+                userInput = userInput,
+            ),
+        )
 
     /**
      * NOTES page 1 spills past one screen - Suite reveals the rest, Envoi does nothing until
@@ -101,20 +98,19 @@ class TurnHandlerTest {
     @Test
     fun `the admin shell input zone lines up with the ADMIN prompt it's shown on`() {
         val connected =
-            runBlocking {
-                handleTurn(
-                    GatewayRequest(
-                        gatewayVersion = "1.0",
-                        minitelVersion = "???",
-                        userId = "test",
-                        remoteAddress = "127.0.0.1",
-                        socketType = GatewayRequest.SocketType.WebSocket,
-                        state = MinitelSessionState.initial(),
-                        event = Event.Connection,
-                        userInput = emptyList(),
-                    ),
-                )
-            }
+            handleTurn(
+                GatewayRequest(
+                    gatewayVersion = "1.0",
+                    minitelVersion = "???",
+                    userId = "test",
+                    remoteAddress = "127.0.0.1",
+                    socketType = GatewayRequest.SocketType.WebSocket,
+                    state = MinitelSessionState.initial(),
+                    event = Event.Connection,
+                    userInput = emptyList(),
+                ),
+            )
+
         val usernamePrompt = turn(connected.state, FunctionKey.Envoi, userInput = listOf("LOGON"))
         val passwordPrompt = turn(usernamePrompt.state, FunctionKey.Envoi, userInput = listOf("CJOHNSON"))
         val shellPrompt = turn(passwordPrompt.state, FunctionKey.Envoi, userInput = listOf("TIER3"))
@@ -132,20 +128,19 @@ class TurnHandlerTest {
     @Test
     fun `the UID display screen wraps the bracketed UID in VideotexBuilder's withBlink`() {
         val connected =
-            runBlocking {
-                handleTurn(
-                    GatewayRequest(
-                        gatewayVersion = "1.0",
-                        minitelVersion = "???",
-                        userId = "test",
-                        remoteAddress = "127.0.0.1",
-                        socketType = GatewayRequest.SocketType.WebSocket,
-                        state = MinitelSessionState.initial(),
-                        event = Event.Connection,
-                        userInput = emptyList(),
-                    ),
-                )
-            }
+            handleTurn(
+                GatewayRequest(
+                    gatewayVersion = "1.0",
+                    minitelVersion = "???",
+                    userId = "test",
+                    remoteAddress = "127.0.0.1",
+                    socketType = GatewayRequest.SocketType.WebSocket,
+                    state = MinitelSessionState.initial(),
+                    event = Event.Connection,
+                    userInput = emptyList(),
+                ),
+            )
+
         val usernamePrompt = turn(connected.state, FunctionKey.Envoi, userInput = listOf("LOGON"))
         val passwordPrompt = turn(usernamePrompt.state, FunctionKey.Envoi, userInput = listOf("TESTER"))
         val shellPrompt = turn(passwordPrompt.state, FunctionKey.Envoi, userInput = listOf("PORTAL"))

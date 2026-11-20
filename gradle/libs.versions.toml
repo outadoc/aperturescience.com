@@ -28,6 +28,7 @@ ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 minipavi-core = { module = "fr.outadoc.minipavi:core", version.ref = "minipavi" }
 minipavi-core-ktor = { module = "fr.outadoc.minipavi:core-ktor", version.ref = "minipavi" }
+minipavi-core-cloudflare = { module = "fr.outadoc.minipavi:core-cloudflare", version.ref = "minipavi" }
 minipavi-videotex = { module = "fr.outadoc.minipavi:videotex", version.ref = "minipavi" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 

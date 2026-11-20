@@ -3,7 +3,6 @@ package com.aperturescience.terminal.minitel
 import com.aperturescience.terminal.EngineState
 import com.aperturescience.terminal.Intent
 import com.aperturescience.terminal.TerminalEngine
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 
 /**
@@ -65,7 +64,7 @@ data class MinitelSessionState(
         fun initial(): MinitelSessionState =
             from(
                 engineState =
-                    runBlocking {
+                    runWithoutSuspending {
                         val engine = TerminalEngine(instantReveal = true)
                         engine.dispatch(Intent.ViewportResized(ScreenChunker.WRAP_WIDTH))
                         engine.dispatch(Intent.Boot)

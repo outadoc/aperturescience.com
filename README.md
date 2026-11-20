@@ -12,7 +12,7 @@ fake DOS terminal from the 2007 *Portal* ARG site (aperturescience.com).
 
 ## Project structure
 
-Five Gradle modules:
+Seven Gradle modules:
 
 - **`logic/`** — the state machine (`TerminalEngine`). No UI framework
   dependency. Exposes a `StateFlow<String>` (current screen) and
@@ -20,10 +20,17 @@ Five Gradle modules:
 - **`ui-terminal/`** — Mosaic-based terminal UI. Depends on `logic`. Has the
   `main()` entry point and shadow-jar setup.
 - **`ui-web/`** — browser/Compose-for-Web frontend. Depends on `logic`.
-- **`ui-minitel/`** — Minitel/Vidéotex frontend, built on
-  [minipavi-kotlin](https://github.com/outadoc/minipavi-kotlin). An embedded
-  Ktor server speaking the [MiniPavi](https://www.minipavi.fr/) gateway
-  protocol. See [Running `ui-minitel` locally](#running-ui-minitel-locally).
+- **`ui-minitel-core/`** — Minitel/Vidéotex frontend logic, built on
+  [minipavi-kotlin](https://github.com/outadoc/minipavi-kotlin): turns each
+  [MiniPavi](https://www.minipavi.fr/) gateway request into a Vidéotex frame.
+  Depends on `logic`. Kotlin Multiplatform (JVM and JS), shared by the two
+  hosts below.
+- **`ui-minitel/`** — the Minitel service as an embedded Ktor server, shipped
+  as a Docker image. Depends on `ui-minitel-core`. See [Running `ui-minitel`
+  locally](#running-ui-minitel-locally).
+- **`ui-minitel-worker/`** — the same Minitel service on Cloudflare Workers
+  (Kotlin/JS), deployed from `main`. Depends on `ui-minitel-core`. See
+  [its README](ui-minitel-worker/README.md).
 - **`ui-telnet/`** — telnet server frontend, built on
   [Ktor Network](https://ktor.io/docs/servers-raw-sockets.html)'s raw
   sockets. Depends on `logic`. One `TerminalEngine` per connection, same
