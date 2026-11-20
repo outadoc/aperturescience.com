@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
+      contents: read
       packages: write
 
     steps:
@@ -30,6 +31,9 @@ jobs:
         env:
           GHCR_USERNAME: token
           GHCR_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+          # Reads outadoc/minipavi-kotlin from GitHub Packages
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-telnet:
     runs-on: ubuntu-latest
