@@ -5,13 +5,13 @@ mosaic = "0.18.0"
 shadow = "9.6.1"
 ktlint = "14.2.0"
 kotlinx-browser = "0.5.0"
-# Pinned to the same Ktor version outadoc/minipavi-kotlin's `core` module is itself compiled
+# Pinned to the same Ktor version outadoc/minipavi-kotlin's `core-ktor` module is itself compiled
 # against, rather than the latest 3.x, to avoid mixing minor versions against its compiled API.
 ktor = "3.0.2"
 kotlinx-serialization = "1.11.0"
-# outadoc/minipavi-kotlin, published via JitPack (no Maven Central releases) - see
-# https://github.com/outadoc/minipavi-kotlin/releases for newer tags.
-minipavi = "0.0.9"
+# outadoc/minipavi-kotlin, published to GitHub Packages (no Maven Central releases) - see
+# https://github.com/outadoc/minipavi-kotlin/packages for newer versions.
+minipavi = "0.1.0"
 logback = "1.5.16"
 
 [libraries]
@@ -26,8 +26,9 @@ ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
 ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
 ktor-network = { module = "io.ktor:ktor-network", version.ref = "ktor" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
-minipavi-core = { module = "com.github.outadoc.minipavi-kotlin:core", version.ref = "minipavi" }
-minipavi-videotex = { module = "com.github.outadoc.minipavi-kotlin:videotex", version.ref = "minipavi" }
+minipavi-core = { module = "fr.outadoc.minipavi:core", version.ref = "minipavi" }
+minipavi-core-ktor = { module = "fr.outadoc.minipavi:core-ktor", version.ref = "minipavi" }
+minipavi-videotex = { module = "fr.outadoc.minipavi:videotex", version.ref = "minipavi" }
 logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 [plugins]

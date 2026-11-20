@@ -16,6 +16,7 @@ application {
 dependencies {
     implementation(project(":logic"))
     implementation(libs.minipavi.core)
+    implementation(libs.minipavi.core.ktor)
     implementation(libs.minipavi.videotex)
     implementation(libs.ktor.server.core)
     implementation(libs.ktor.server.netty)

@@ -82,6 +82,21 @@ minipavi-kotlin](https://github.com/outadoc/minipavi-kotlin/tree/main/.docker):
 
 To try it out:
 
+`ui-minitel` depends on minipavi-kotlin, which is published to GitHub
+Packages. GitHub Packages requires authentication even for public packages,
+so give Gradle a [personal access
+token](https://github.com/settings/tokens) with the `read:packages` scope,
+either in `~/.gradle/gradle.properties`:
+
+```properties
+gpr.user=<your GitHub username>
+gpr.key=<your token>
+```
+
+or through the `GITHUB_ACTOR` and `GITHUB_TOKEN` environment variables. To
+build against a local checkout of minipavi-kotlin instead, run its
+`publishToMavenLocal` task and pass `-Pminipavi.mavenLocal=true` here.
+
 1. Start `ui-minitel` (listens on `:8080`):
    ```sh
    ./gradlew :ui-minitel:run
