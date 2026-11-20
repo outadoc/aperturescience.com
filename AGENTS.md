@@ -395,6 +395,18 @@ right, don't just trust that the script ran without throwing.
 
 ## Minitel frontend: ui-minitel
 
+> **Current layout (supersedes the module/dependency details below):** the
+> turn logic (`TurnHandler.kt`, `MinitelSessionState`, `ScreenChunker`, ...)
+> now lives in `ui-minitel-core/` (Kotlin Multiplatform, `jvm()` + `js()`;
+> tests in `commonTest` run on both). Two thin hosts depend on it:
+> `ui-minitel/` (Ktor/Netty, Docker image) and `ui-minitel-worker/`
+> (Cloudflare Workers via minipavi-kotlin's `core-cloudflare`, deployed by the
+> `Deploy Cloudflare Worker` workflow). minipavi-kotlin 0.1.0+ comes from
+> GitHub Packages (`fr.outadoc.minipavi:*`), not JitPack. `handleTurn` is no
+> longer `suspend`: it runs the engine through `runWithoutSuspending`, which
+> relies on `instantReveal = true` so no turn ever actually suspends (there's
+> no `runBlocking` on JS).
+
 `cli/ui-minitel/` serves the same terminal over a real Minitel via
 [`outadoc/minipavi-kotlin`](https://github.com/outadoc/minipavi-kotlin), a
 Ktor SDK for the "MiniPavi" Minitel/Vidéotex gateway platform, published only

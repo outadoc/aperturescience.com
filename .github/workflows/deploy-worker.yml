@@ -1,0 +1,77 @@
+name: Deploy Cloudflare Worker
+
+# Deploys the Minitel service (ui-minitel-worker) to Cloudflare Workers on every push to main,
+# or on demand from the Actions tab.
+#
+# The job runs in the "production" GitHub Actions environment, which holds the secrets:
+#   - CLOUDFLARE_API_TOKEN: Cloudflare API token with the "Workers Scripts: Edit" permission
+#   - CLOUDFLARE_ACCOUNT_ID: Cloudflare account ID
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    environment: production
+
+    defaults:
+      run:
+        working-directory: ui-minitel-worker
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: "temurin"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui-minitel-worker/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # Reads outadoc/minipavi-kotlin from GitHub Packages
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy
+        # On a brand-new Worker's first deploy, wrangler creates the script and then immediately
+        # reads its workers.dev settings, which the API may not know about yet ("This Worker does
+        # not exist on your account", code 10007). wrangler doesn't retry that, so retry once.
+        run: |
+          if ! npx wrangler deploy; then
+            echo "::warning::Deploy failed, retrying in 15 seconds."
+            sleep 15
+            npx wrangler deploy
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
