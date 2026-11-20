@@ -28,8 +28,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Build and test the Minitel service (JVM and JS)
-        run: ./gradlew :ui-minitel-core:allTests :ui-minitel:build :ui-minitel:buildImage :ui-minitel-worker:jsNodeProductionLibraryDistribution
+      - name: Build and test the Minitel service (JVM and JS) and the website
+        run: ./gradlew :ui-minitel-core:allTests :ui-minitel:build :ui-minitel:buildImage :ui-minitel-worker:jsNodeProductionLibraryDistribution :ui-web:wasmJsBrowserDistribution
         env:
           # Reads outadoc/minipavi-kotlin from GitHub Packages
           GITHUB_ACTOR: ${{ github.actor }}
